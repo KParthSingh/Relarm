@@ -53,6 +53,47 @@ class AlarmRingingActivity : ComponentActivity() {
         val serviceIntent = Intent(this, AlarmService::class.java)
         stopService(serviceIntent)
         
+        // Stop countdown service from previous alarm
+        val stopCountdownIntent = Intent(this, CountdownService::class.java)
+        stopService(stopCountdownIntent)
+        
+        // Check if we're in a chain and need to start the next alarm
+        val chainManager = ChainManager(this)
+        if (chainManager.isChainActive()) {
+            val alarmRepository = AlarmRepository(this)
+            val alarms = alarmRepository.loadAlarms()
+            
+            // Move to next alarm
+            chainManager.moveToNextAlarm()
+            val nextIndex = chainManager.getCurrentIndex()
+            
+            if (nextIndex < alarms.size) {
+                // Start the next alarm in the chain
+                val nextAlarm = alarms[nextIndex]
+                val delayMillis = nextAlarm.getTotalSeconds() * 1000L
+                
+                val alarmScheduler = AlarmScheduler(this)
+                alarmScheduler.scheduleAlarm(delayMillis, nextIndex + 1)
+                
+                // Start countdown service for next alarm (after stopping the old one)
+                val countdownIntent = Intent(this, CountdownService::class.java).apply {
+                    putExtra("triggerTime", System.currentTimeMillis() + delayMillis)
+                }
+                startForegroundService(countdownIntent)
+                
+                // Update alarm state in repository
+                val updatedAlarms = alarms.toMutableList()
+                updatedAlarms[nextIndex] = nextAlarm.copy(
+                    isActive = true,
+                    scheduledTime = System.currentTimeMillis() + delayMillis
+                )
+                alarmRepository.saveAlarms(updatedAlarms)
+            } else {
+                // Chain complete
+                chainManager.stopChain()
+            }
+        }
+        
         // Close this activity
         finish()
     }

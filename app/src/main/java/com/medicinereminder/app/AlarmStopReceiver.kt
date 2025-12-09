@@ -17,6 +17,10 @@ class AlarmStopReceiver : BroadcastReceiver() {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
             
+            // Stop countdown service from previous alarm
+            val stopCountdownIntent = Intent(context, CountdownService::class.java)
+            context.stopService(stopCountdownIntent)
+            
             // Check if we're in a chain and need to start the next alarm
             val chainManager = ChainManager(context)
             if (chainManager.isChainActive()) {
@@ -34,6 +38,12 @@ class AlarmStopReceiver : BroadcastReceiver() {
                     
                     val alarmScheduler = AlarmScheduler(context)
                     alarmScheduler.scheduleAlarm(delayMillis, nextIndex + 1)
+                    
+                    // Start countdown service for next alarm (after stopping the old one)
+                    val countdownIntent = Intent(context, CountdownService::class.java).apply {
+                        putExtra("triggerTime", System.currentTimeMillis() + delayMillis)
+                    }
+                    context.startForegroundService(countdownIntent)
                     
                     // Update alarm state in repository
                     val updatedAlarms = alarms.toMutableList()

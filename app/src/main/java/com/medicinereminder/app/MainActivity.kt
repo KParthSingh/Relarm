@@ -168,6 +168,85 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Chain progress indicator
+        val chainManager = remember { ChainManager(context) }
+        if (chainManager.isChainActive()) {
+            val currentIndex = chainManager.getCurrentIndex()
+            if (currentIndex < alarms.size) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF03DAC5)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "🔗 Chain Active",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Alarm ${currentIndex + 1} of ${alarms.size}",
+                                    fontSize = 12.sp,
+                                    color = Color.White.copy(alpha = 0.9f)
+                                )
+                            }
+                            
+                            val currentAlarm = alarms.getOrNull(currentIndex)
+                            if (currentAlarm != null) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = if (currentAlarm.name.isNotBlank()) currentAlarm.name else "Alarm ${currentIndex + 1}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = currentAlarm.getFormattedTime(),
+                                        fontSize = 12.sp,
+                                        color = Color.White.copy(alpha = 0.9f)
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Progress bar
+                        val progress = (currentIndex + 1).toFloat() / alarms.size.toFloat()
+                        LinearProgressIndicator(
+                            progress = progress,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
+                            color = Color.White,
+                            trackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = "${alarms.size - currentIndex - 1} alarm(s) remaining",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+        }
+
         // Alarm list
         if (alarms.isEmpty()) {
             // Empty state
