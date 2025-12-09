@@ -209,56 +209,102 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 alarms.forEachIndexed { index, alarm ->
-                    AlarmCard(
-                        alarm = alarm,
-                        index = index,
-                        totalCount = alarms.size,
-                        onUpdate = { updatedAlarm ->
-                            alarms = alarms.toMutableList().apply {
-                                set(index, updatedAlarm)
-                            }
-                        },
-                        onClone = {
-                            alarms = alarms.toMutableList().apply {
-                                add(index + 1, alarm.clone())
-                            }
-                        },
-                        onRemove = {
-                            alarms = alarms.toMutableList().apply {
-                                removeAt(index)
-                            }
-                        },
-                        onMoveUp = {
-                            if (index > 0) {
+                    Column {
+                        AlarmCard(
+                            alarm = alarm,
+                            index = index,
+                            onUpdate = { updatedAlarm ->
                                 alarms = alarms.toMutableList().apply {
-                                    val temp = this[index]
-                                    this[index] = this[index - 1]
-                                    this[index - 1] = temp
+                                    set(index, updatedAlarm)
+                                }
+                            },
+                            onSchedule = { delayMillis ->
+                                onScheduleAlarm(delayMillis, index + 1)
+                                alarms = alarms.toMutableList().apply {
+                                    set(index, alarm.copy(
+                                        isActive = true,
+                                        scheduledTime = System.currentTimeMillis() + delayMillis
+                                    ))
                                 }
                             }
-                        },
-                        onMoveDown = {
-                            if (index < alarms.size - 1) {
-                                alarms = alarms.toMutableList().apply {
-                                    val temp = this[index]
-                                    this[index] = this[index + 1]
-                                    this[index + 1] = temp
-                                }
+                        )
+                        
+                        // Action buttons row (outside card)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 6.dp)
+                        ) {
+                            // Clone button
+                            OutlinedButton(
+                                onClick = {
+                                    alarms = alarms.toMutableList().apply {
+                                        add(index + 1, alarm.clone())
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(6.dp)
+                            ) {
+                                Text("📋 Clone", fontSize = 11.sp)
                             }
-                        },
-                        onSchedule = { delayMillis ->
-                            onScheduleAlarm(delayMillis, index + 1)
-                            alarms = alarms.toMutableList().apply {
-                                set(index, alarm.copy(
-                                    isActive = true,
-                                    scheduledTime = System.currentTimeMillis() + delayMillis
-                                ))
+
+                            // Move up
+                            OutlinedButton(
+                                onClick = {
+                                    if (index > 0) {
+                                        alarms = alarms.toMutableList().apply {
+                                            val temp = this[index]
+                                            this[index] = this[index - 1]
+                                            this[index - 1] = temp
+                                        }
+                                    }
+                                },
+                                enabled = index > 0,
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(6.dp)
+                            ) {
+                                Text("↑", fontSize = 11.sp)
+                            }
+
+                            // Move down
+                            OutlinedButton(
+                                onClick = {
+                                    if (index < alarms.size - 1) {
+                                        alarms = alarms.toMutableList().apply {
+                                            val temp = this[index]
+                                            this[index] = this[index + 1]
+                                            this[index + 1] = temp
+                                        }
+                                    }
+                                },
+                                enabled = index < alarms.size - 1,
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(6.dp)
+                            ) {
+                                Text("↓", fontSize = 11.sp)
+                            }
+
+                            // Remove
+                            OutlinedButton(
+                                onClick = {
+                                    alarms = alarms.toMutableList().apply {
+                                        removeAt(index)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = Color.Red
+                                ),
+                                contentPadding = PaddingValues(6.dp)
+                            ) {
+                                Text("🗑️", fontSize = 11.sp)
                             }
                         }
-                    )
+                    }
                 }
             }
         }
@@ -281,12 +327,7 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
 fun AlarmCard(
     alarm: Alarm,
     index: Int,
-    totalCount: Int,
     onUpdate: (Alarm) -> Unit,
-    onClone: () -> Unit,
-    onRemove: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
     onSchedule: (Long) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -357,19 +398,13 @@ fun AlarmCard(
 
             // Expanded content
             if (expanded) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 Divider()
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 // Name field
-                Text(
-                    text = "Alarm Name (Optional)",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
-                Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = name,
                     onValueChange = { 
@@ -377,63 +412,54 @@ fun AlarmCard(
                         onUpdate(alarm.copy(name = it))
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("e.g., First Medicine", fontSize = 13.sp) },
+                    label = { Text("Name (optional)", fontSize = 10.sp) },
+                    placeholder = { Text("e.g., First Medicine", fontSize = 12.sp) },
                     singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Time picker
-                Text(
-                    text = "Set Time",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
+                // Time picker - more compact
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    TimePickerColumn(
+                    CompactTimePickerColumn(
                         value = hours,
                         range = 0..23,
                         label = "H",
                         onValueChange = { 
                             hours = it
-                            // Reset active state when time is changed
                             onUpdate(alarm.copy(hours = it, isActive = false, scheduledTime = 0L))
                         }
                     )
-                    Text(":", fontSize = 20.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 3.dp))
-                    TimePickerColumn(
+                    Text(":", fontSize = 18.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 2.dp))
+                    CompactTimePickerColumn(
                         value = minutes,
                         range = 0..59,
                         label = "M",
                         onValueChange = { 
                             minutes = it
-                            // Reset active state when time is changed
                             onUpdate(alarm.copy(minutes = it, isActive = false, scheduledTime = 0L))
                         }
                     )
-                    Text(":", fontSize = 20.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 3.dp))
-                    TimePickerColumn(
+                    Text(":", fontSize = 18.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 2.dp))
+                    CompactTimePickerColumn(
                         value = seconds,
                         range = 0..59,
                         label = "S",
                         onValueChange = { 
                             seconds = it
-                            // Reset active state when time is changed
                             onUpdate(alarm.copy(seconds = it, isActive = false, scheduledTime = 0L))
                         }
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Quick presets
+                // Quick presets - compact
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -449,90 +475,82 @@ fun AlarmCard(
                                 hours = time.first
                                 minutes = time.second
                                 seconds = time.third
-                                // Reset active state when preset is used
                                 onUpdate(alarm.copy(hours = time.first, minutes = time.second, seconds = time.third, isActive = false, scheduledTime = 0L))
                             },
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(2.dp)
                         ) {
-                            Text(label, fontSize = 10.sp)
+                            Text(label, fontSize = 9.sp)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Action buttons
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
+                // Start button only
+                Button(
+                    onClick = {
+                        val delayMillis = alarm.getTotalSeconds() * 1000L
+                        onSchedule(delayMillis)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !alarm.isActive && alarm.getTotalSeconds() > 0,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6200EE)
+                    ),
+                    contentPadding = PaddingValues(10.dp)
                 ) {
-                    // Start button
-                    Button(
-                        onClick = {
-                            val delayMillis = alarm.getTotalSeconds() * 1000L
-                            onSchedule(delayMillis)
-                        },
-                        modifier = Modifier.weight(1f),
-                        enabled = !alarm.isActive && alarm.getTotalSeconds() > 0,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6200EE)
-                        ),
-                        contentPadding = PaddingValues(8.dp)
-                    ) {
-                        Text("Start", fontSize = 12.sp)
-                    }
-
-                    // Clone button
-                    OutlinedButton(
-                        onClick = onClone,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(8.dp)
-                    ) {
-                        Text("Clone", fontSize = 12.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Move up
-                    OutlinedButton(
-                        onClick = onMoveUp,
-                        enabled = index > 0,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(8.dp)
-                    ) {
-                        Text("↑ Up", fontSize = 12.sp)
-                    }
-
-                    // Move down
-                    OutlinedButton(
-                        onClick = onMoveDown,
-                        enabled = index < totalCount - 1,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(8.dp)
-                    ) {
-                        Text("↓ Down", fontSize = 12.sp)
-                    }
-
-                    // Remove
-                    OutlinedButton(
-                        onClick = onRemove,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.Red
-                        ),
-                        contentPadding = PaddingValues(8.dp)
-                    ) {
-                        Text("Remove", fontSize = 12.sp)
-                    }
+                    Text("Start Alarm", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
+    }
+}
+
+// New compact time picker column
+@Composable
+fun CompactTimePickerColumn(
+    value: Int,
+    range: IntRange,
+    label: String,
+    onValueChange: (Int) -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(50.dp)
+    ) {
+        IconButton(
+            onClick = { 
+                val newValue = if (value < range.last) value + 1 else range.first
+                onValueChange(newValue)
+            },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Text("▲", fontSize = 10.sp, color = Color(0xFF6200EE))
+        }
+
+        Text(
+            text = String.format("%02d", value),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF6200EE)
+        )
+
+        IconButton(
+            onClick = { 
+                val newValue = if (value > range.first) value - 1 else range.last
+                onValueChange(newValue)
+            },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Text("▼", fontSize = 10.sp, color = Color(0xFF6200EE))
+        }
+
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            color = Color.Gray
+        )
     }
 }
 
