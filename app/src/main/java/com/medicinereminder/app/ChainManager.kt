@@ -10,6 +10,7 @@ class ChainManager(private val context: Context) {
         private const val KEY_CURRENT_INDEX = "current_index"
         private const val KEY_IS_PAUSED = "is_paused"
         private const val KEY_REMAINING_TIME = "remaining_time"
+        private const val KEY_CURRENT_REMAINING = "current_remaining_time"
     }
     
     fun startChain() {
@@ -67,5 +68,15 @@ class ChainManager(private val context: Context) {
 
     fun getPausedRemainingTime(): Long {
         return prefs.getLong(KEY_REMAINING_TIME, 0L)
+    }
+
+    fun setCurrentRemainingTime(remainingTimeMs: Long) {
+        prefs.edit()
+            .putLong(KEY_CURRENT_REMAINING, remainingTimeMs)
+            .apply()
+    }
+
+    fun getCurrentRemainingTime(): Long {
+        return prefs.getLong(KEY_CURRENT_REMAINING, 0L)
     }
 }

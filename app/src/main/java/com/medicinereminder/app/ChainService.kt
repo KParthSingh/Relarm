@@ -50,6 +50,9 @@ class ChainService : Service() {
     private fun updateNotification() {
         val remaining = ((endTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
         
+        // Update ChainManager with current remaining time (single source of truth)
+        ChainManager(this).setCurrentRemainingTime(remaining * 1000L)
+        
         val notification = NotificationHelper.buildChainNotification(
             this,
             currentIndex + 1,
@@ -236,11 +239,17 @@ class ChainService : Service() {
     }
 
     private fun showPausedNotification() {
-         val notification = NotificationHelper.buildChainNotification(
+        val remainingTimeMs = ChainManager(this).getPausedRemainingTime()
+        val remainingSeconds = (remainingTimeMs / 1000).toInt()
+        
+        // Update ChainManager with current remaining time (frozen while paused)
+        ChainManager(this).setCurrentRemainingTime(remainingTimeMs)
+        
+        val notification = NotificationHelper.buildChainNotification(
             this,
             currentIndex + 1,
             totalAlarms,
-            0, // Time irrelevant when paused, or could show saved remaining
+            remainingSeconds,
             currentAlarmName,
             isPaused = true
         )

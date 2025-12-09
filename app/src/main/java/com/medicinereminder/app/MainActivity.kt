@@ -356,12 +356,16 @@ fun StickyChainBar(
     isPaused: Boolean,
     pausedData: Long
 ) {
-    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
-
-    LaunchedEffect(isPaused) {
-        while (!isPaused) {
-            currentTime = System.currentTimeMillis()
-            delay(1000)
+    val context = LocalContext.current
+    val chainManager = remember { ChainManager(context) }
+    
+    // Read remaining time from ChainManager (single source of truth updated by ChainService)
+    var remainingTimeMs by remember { mutableLongStateOf(0L) }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            remainingTimeMs = chainManager.getCurrentRemainingTime()
+            delay(100) // Poll frequently for smooth updates
         }
     }
 
@@ -432,11 +436,7 @@ fun StickyChainBar(
             )
             Spacer(modifier = Modifier.height(8.dp))
             
-            val remainingSeconds = if (isPaused) {
-                (pausedData / 1000).toInt()
-            } else {
-                ((currentAlarm.scheduledTime - currentTime) / 1000).toInt().coerceAtLeast(0)
-            }
+            val remainingSeconds = (remainingTimeMs / 1000).toInt().coerceAtLeast(0)
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
@@ -680,5 +680,7 @@ fun formatTime(seconds: Int): String {
     val h = seconds / 3600
     val m = (seconds % 3600) / 60
     val s = seconds % 60
-    return String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
+    return if (h > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
+           else if (m > 0) String.format(Locale.getDefault(), "%d:%02d", m, s)
+           else "${s}s"
 }
