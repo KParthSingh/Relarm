@@ -549,6 +549,7 @@ fun AlarmItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditAlarmContent(
     alarm: Alarm,
@@ -608,71 +609,78 @@ fun EditAlarmContent(
         }
     }
     
-    // Time picker dialog
+    // Duration Picker Bottom Sheet
     if (showTimePicker) {
-        AlertDialog(
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
             onDismissRequest = { showTimePicker = false },
-            title = { Text("Set Time") },
-            text = {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TimeInput(alarm.hours, 23, "Hr") { onUpdate(alarm.copy(hours = it, isActive = false)) }
-                        Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
-                        TimeInput(alarm.minutes, 59, "Min") { onUpdate(alarm.copy(minutes = it, isActive = false)) }
-                        Text(":", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
-                        TimeInput(alarm.seconds, 59, "Sec") { onUpdate(alarm.copy(seconds = it, isActive = false)) }
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Set Duration",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+
+                SimpleDurationPicker(
+                    hours = alarm.hours,
+                    minutes = alarm.minutes,
+                    seconds = alarm.seconds,
+                    onTimeChange = { h, m, s ->
+                        onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    // Quick presets
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        listOf(5, 30, 60, 300).forEach { sec ->
-                            OutlinedButton(
-                                onClick = {
-                                    val h = sec / 3600; val m = (sec % 3600) / 60; val s = sec % 60
-                                    onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                Text(if (sec < 60) "${sec}s" else "${sec/60}m", style = MaterialTheme.typography.labelSmall)
-                            }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Quick presets
+                Text(
+                    "Quick Add", 
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(), 
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    listOf(10, 30, 60, 300).forEach { sec ->
+                        OutlinedButton(
+                            onClick = {
+                                val currentTotal = alarm.getTotalSeconds()
+                                val newTotal = currentTotal + sec
+                                val h = newTotal / 3600
+                                val m = (newTotal % 3600) / 60
+                                val s = newTotal % 60
+                                onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false))
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Text("+${if (sec < 60) "${sec}s" else "${sec/60}m"}")
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showTimePicker = false }) {
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Button(
+                    onClick = { showTimePicker = false },
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
                     Text("Done")
                 }
+                Spacer(modifier = Modifier.height(24.dp))
             }
-        )
-    }
-}
-
-@Composable
-fun TimeInput(
-    value: Int,
-    max: Int,
-    label: String,
-    onValueChange: (Int) -> Unit
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        IconButton(onClick = { onValueChange(if (value < max) value + 1 else 0) }) {
-            Text("▲")
         }
-        Text(
-            String.format("%02d", value),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        IconButton(onClick = { onValueChange(if (value > 0) value - 1 else max) }) {
-            Text("▼")
-        }
-        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 
