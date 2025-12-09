@@ -1,10 +1,10 @@
 [
     {
-        "merged": "com.medicinereminder.app-merged_res-4:/xml_data_extraction_rules.xml.flat",
-        "source": "com.medicinereminder.app-main-6:/xml/data_extraction_rules.xml"
+        "merged": "C:\\Users\\Om Singh\\.gradle\\daemon\\9.0-milestone-1\\com.medicinereminder.app-merged_res-4:\\xml_data_extraction_rules.xml.flat",
+        "source": "C:\\Users\\Om Singh\\.gradle\\daemon\\9.0-milestone-1\\com.medicinereminder.app-main-6:\\xml\\data_extraction_rules.xml"
     },
     {
-        "merged": "com.medicinereminder.app-merged_res-4:/xml_backup_rules.xml.flat",
-        "source": "com.medicinereminder.app-main-6:/xml/backup_rules.xml"
+        "merged": "C:\\Users\\Om Singh\\.gradle\\daemon\\9.0-milestone-1\\com.medicinereminder.app-merged_res-4:\\xml_backup_rules.xml.flat",
+        "source": "C:\\Users\\Om Singh\\.gradle\\daemon\\9.0-milestone-1\\com.medicinereminder.app-main-6:\\xml\\backup_rules.xml"
     }
 ]

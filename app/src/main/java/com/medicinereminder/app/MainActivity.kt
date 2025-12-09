@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
+import com.medicinereminder.app.ui.theme.MedicineReminderTheme
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -121,37 +122,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- THEME ---
-@Composable
-fun MedicineReminderTheme(content: @Composable () -> Unit) {
-    val primaryColor = Color(0xFF6750A4) // Deep Purple
-    val secondaryColor = Color(0xFF625B71)
-    val tertiaryColor = Color(0xFF7D5260) // Pinkish
-    val background = Color(0xFFFDF8FD)
-
-    val colorScheme = lightColorScheme(
-        primary = primaryColor,
-        onPrimary = Color.White,
-        primaryContainer = Color(0xFFEADDFF),
-        onPrimaryContainer = Color(0xFF21005D),
-        secondary = secondaryColor,
-        onSecondary = Color.White,
-        secondaryContainer = Color(0xFFE8DEF8),
-        onSecondaryContainer = Color(0xFF1D192B),
-        tertiary = tertiaryColor,
-        onTertiary = Color.White,
-        background = background,
-        surface = Color(0xFFFFFBFE),
-        surfaceVariant = Color(0xFFE7E0EC),
-        onSurface = Color(0xFF1C1B1F)
-    )
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography(), // Default Material 3 typography
-        content = content
-    )
-}
+// --- THEME moved to ui.theme package ---
 
 // --- MAIN SCREEN ---
 @OptIn(ExperimentalMaterial3Api::class)

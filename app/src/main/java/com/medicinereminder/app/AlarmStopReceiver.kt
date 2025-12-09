@@ -17,12 +17,6 @@ class AlarmStopReceiver : BroadcastReceiver() {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
             
-            // Stop ChainService if running (it might be running for countdown)
-            val stopChainServiceIntent = Intent(context, ChainService::class.java).apply {
-                action = ChainService.ACTION_STOP_CHAIN
-            }
-            context.startService(stopChainServiceIntent)
-            
             // Check if we're in a chain and need to start the next alarm
             val chainManager = ChainManager(context)
             if (chainManager.isChainActive()) {
