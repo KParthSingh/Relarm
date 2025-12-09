@@ -22,21 +22,7 @@ class ChainService : Service() {
         NotificationHelper.createNotificationChannel(this)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START_CHAIN_ALARM -> {
-                endTime = intent.getLongExtra(EXTRA_END_TIME, 0)
-                currentIndex = intent.getIntExtra(EXTRA_CURRENT_INDEX, 0)
-                totalAlarms = intent.getIntExtra(EXTRA_TOTAL_ALARMS, 0)
-                currentAlarmName = intent.getStringExtra(EXTRA_ALARM_NAME) ?: ""
-                startCountdown()
-            }
-            ACTION_STOP_CHAIN -> {
-                stopSelf()
-            }
-        }
-        return START_NOT_STICKY
-    }
+
 
     private fun startCountdown() {
         // Start as foreground service with initial notification
@@ -46,10 +32,10 @@ class ChainService : Service() {
         countdownJob?.cancel()
         countdownJob = serviceScope.launch {
             while (isActive && System.currentTimeMillis() < endTime) {
-                delay(1000) // Update every second
+                delay(1000) // Keep the loop to trigger alarm, but don't spam notifications
                 if (!isActive) break
                 
-                updateNotification()
+                // updateNotification() - Removed as per user request to simplify/forget notification
             }
             
             if (isActive) {
@@ -124,11 +110,60 @@ class ChainService : Service() {
     companion object {
         const val ACTION_START_CHAIN_ALARM = "com.medicinereminder.app.START_CHAIN_ALARM"
         const val ACTION_STOP_CHAIN = "com.medicinereminder.app.STOP_CHAIN"
+        const val ACTION_PAUSE_CHAIN = "com.medicinereminder.app.PAUSE_CHAIN"
+        const val ACTION_RESUME_CHAIN = "com.medicinereminder.app.RESUME_CHAIN"
         
         const val EXTRA_END_TIME = "end_time"
         const val EXTRA_CURRENT_INDEX = "current_index"
         const val EXTRA_TOTAL_ALARMS = "total_alarms"
         const val EXTRA_ALARM_NAME = "alarm_name"
         const val EXTRA_IS_CHAIN = "is_chain"
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_START_CHAIN_ALARM -> {
+                endTime = intent.getLongExtra(EXTRA_END_TIME, 0)
+                currentIndex = intent.getIntExtra(EXTRA_CURRENT_INDEX, 0)
+                totalAlarms = intent.getIntExtra(EXTRA_TOTAL_ALARMS, 0)
+                currentAlarmName = intent.getStringExtra(EXTRA_ALARM_NAME) ?: ""
+                startCountdown()
+            }
+            ACTION_STOP_CHAIN -> {
+                stopSelf()
+            }
+            ACTION_PAUSE_CHAIN -> handlePause()
+            ACTION_RESUME_CHAIN -> handleResume()
+        }
+        return START_NOT_STICKY
+    }
+
+    private fun handlePause() {
+        countdownJob?.cancel()
+        val remaining = ((endTime - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+        ChainManager(this).pauseChain(remaining * 1000)
+        showPausedNotification()
+    }
+
+    private fun handleResume() {
+        val remainingTimeStr = ChainManager(this).getPausedRemainingTime()
+        // Reset end time relative to now
+        endTime = System.currentTimeMillis() + remainingTimeStr
+        ChainManager(this).resumeChain()
+        startCountdown()
+    }
+
+    private fun showPausedNotification() {
+         val notification = NotificationHelper.buildChainNotification(
+            this,
+            currentIndex + 1,
+            totalAlarms,
+            0, // Time irrelevant when paused, or could show saved remaining
+            currentAlarmName,
+            isPaused = true
+        )
+        
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
     }
 }

@@ -21,7 +21,8 @@ object NotificationHelper {
         currentStep: Int,
         totalSteps: Int,
         remainingSeconds: Int,
-        nextAlarmName: String
+        nextAlarmName: String,
+        isPaused: Boolean = false
     ): android.app.Notification {
         val stopIntent = Intent(context, ChainService::class.java).apply {
             action = ChainService.ACTION_STOP_CHAIN
@@ -33,6 +34,26 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val pauseIntent = Intent(context, ChainService::class.java).apply {
+            action = ChainService.ACTION_PAUSE_CHAIN
+        }
+        val pausePendingIntent = PendingIntent.getService(
+            context,
+            4,
+            pauseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val resumeIntent = Intent(context, ChainService::class.java).apply {
+            action = ChainService.ACTION_RESUME_CHAIN
+        }
+        val resumePendingIntent = PendingIntent.getService(
+            context,
+            5,
+            resumeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val hours = remainingSeconds / 3600
         val minutes = (remainingSeconds % 3600) / 60
         val seconds = remainingSeconds % 60
@@ -41,20 +62,35 @@ object NotificationHelper {
                        else if (minutes > 0) String.format("%d:%02d", minutes, seconds)
                        else "${seconds}s"
 
-        val title = "Sequence: $currentStep of $totalSteps"
-        val content = "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"} in $timeText"
+        val title = "Sequence: $currentStep of $totalSteps ${if(isPaused) "(PAUSED)" else ""}"
+        val content = if (isPaused) "Tap RESUME to continue." else "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"} in $timeText"
 
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(title)
             .setContentText(content)
-            .setPriority(NotificationCompat.PRIORITY_LOW) // Low priority for ongoing silent notification
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setAutoCancel(false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setColor(Color.parseColor("#6750A4"))
-            .addAction(
+            
+        if (isPaused) {
+            builder.addAction(
+                android.R.drawable.ic_media_play,
+                "RESUME",
+                resumePendingIntent
+            )
+        } else {
+            builder.addAction(
+                android.R.drawable.ic_media_pause,
+                "PAUSE",
+                pausePendingIntent
+            )
+        }
+            
+        return builder.addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "STOP SEQUENCE",
                 stopPendingIntent

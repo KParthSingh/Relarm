@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -160,6 +161,22 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
     val repository = remember { AlarmRepository(context) }
     var alarms by remember { mutableStateOf(repository.loadAlarms()) }
     
+    val chainManager = remember { ChainManager(context) }
+    var isChainActive by remember { mutableStateOf(chainManager.isChainActive()) }
+    var isPaused by remember { mutableStateOf(chainManager.isChainPaused()) }
+    var currentChainIndex by remember { mutableIntStateOf(chainManager.getCurrentIndex()) }
+
+    // Sync State Loop
+    LaunchedEffect(Unit) {
+        while (true) {
+            alarms = repository.loadAlarms()
+            isChainActive = chainManager.isChainActive()
+            isPaused = chainManager.isChainPaused()
+            currentChainIndex = chainManager.getCurrentIndex()
+            delay(1000) // Poll every second for updates from Service/Receiver
+        }
+    }
+    
     LaunchedEffect(alarms) {
         repository.saveAlarms(alarms)
     }
@@ -180,13 +197,40 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { alarms = alarms + Alarm() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                icon = { Icon(Icons.Default.Add, "Add Alarm") },
-                text = { Text(stringResource(R.string.btn_new_alarm)) }
-            )
+            if (!isChainActive) {
+                ExtendedFloatingActionButton(
+                    onClick = { alarms = alarms + Alarm() },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Default.Add, "Add Alarm") },
+                    text = { Text(stringResource(R.string.btn_new_alarm)) }
+                )
+            }
+        },
+        bottomBar = {
+            if (isChainActive) {
+                if (currentChainIndex < alarms.size) {
+                    StickyChainBar(
+                        currentIndex = currentChainIndex,
+                        totalAlarms = alarms.size,
+                        currentAlarm = alarms[currentChainIndex],
+                        onPause = {
+                            val intent = Intent(context, ChainService::class.java).apply {
+                                action = ChainService.ACTION_PAUSE_CHAIN
+                            }
+                            context.startService(intent)
+                        },
+                        onResume = {
+                            val intent = Intent(context, ChainService::class.java).apply {
+                                action = ChainService.ACTION_RESUME_CHAIN
+                            }
+                            context.startService(intent)
+                        },
+                        isPaused = isPaused,
+                        pausedData = if(isPaused) chainManager.getPausedRemainingTime() else 0L
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         Column(
@@ -195,21 +239,8 @@ fun MainScreen(onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit) {
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            val chainManager = remember { ChainManager(context) }
-            val isChainActive = chainManager.isChainActive()
-            
-            // CHAIN STATUS CARD
-            if (isChainActive) {
-                val currentIndex = chainManager.getCurrentIndex()
-                if (currentIndex < alarms.size) {
-                    ChainStatusCard(
-                        currentIndex = currentIndex,
-                        totalAlarms = alarms.size,
-                        currentAlarm = alarms[currentIndex]
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-            }
+
+
 
             // ALARMS LIST
             if (alarms.isEmpty()) {
@@ -321,13 +352,31 @@ fun EmptyState() {
 }
 
 @Composable
-fun ChainStatusCard(currentIndex: Int, totalAlarms: Int, currentAlarm: Alarm) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-        ),
-        elevation = CardDefaults.cardElevation(4.dp)
+fun StickyChainBar(
+    currentIndex: Int,
+    totalAlarms: Int,
+    currentAlarm: Alarm,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    isPaused: Boolean,
+    pausedData: Long
+) {
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(isPaused) {
+        if (!isPaused) {
+            while (true) {
+                currentTime = System.currentTimeMillis()
+                delay(1000)
+            }
+        }
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        shadowElevation = 8.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -335,29 +384,34 @@ fun ChainStatusCard(currentIndex: Int, totalAlarms: Int, currentAlarm: Alarm) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        stringResource(R.string.chain_active_title),
+                        if (isPaused) "SEQUENCE PAUSED" else stringResource(R.string.chain_active_title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
                     Text(
                         stringResource(R.string.chain_info_format, currentIndex + 1, totalAlarms),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                if (currentAlarm.name.isNotBlank()) {
-                    Surface(
-                         color = MaterialTheme.colorScheme.tertiary,
-                         shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text(
-                            text = currentAlarm.name,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onTertiary
-                        )
-                    }
+                
+                Button(
+                    onClick = { if (isPaused) onResume() else onPause() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = if (isPaused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Icon(
+                        if (isPaused) Icons.Default.PlayArrow else androidx.compose.material.icons.Icons.Default.Info, // Placeholder for Pause if needed, but Text is clearer
+                        contentDescription = null, // decorative
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isPaused) "RESUME" else "PAUSE")
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -365,15 +419,30 @@ fun ChainStatusCard(currentIndex: Int, totalAlarms: Int, currentAlarm: Alarm) {
             LinearProgressIndicator(
                 progress = progress,
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = MaterialTheme.colorScheme.tertiary,
-                trackColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.2f)
+                color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.chain_remaining_format, totalAlarms - currentIndex - 1),
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.align(Alignment.End)
-            )
+            
+            val remainingSeconds = if (isPaused) {
+                (pausedData / 1000).toInt()
+            } else {
+                ((currentAlarm.scheduledTime - currentTime) / 1000).toInt().coerceAtLeast(0)
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    if (isPaused) "Resumes in: ${formatTime(remainingSeconds)}" 
+                    else "Next alarm: ${formatTime(remainingSeconds)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    stringResource(R.string.chain_remaining_format, totalAlarms - currentIndex - 1),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
         }
     }
 }
