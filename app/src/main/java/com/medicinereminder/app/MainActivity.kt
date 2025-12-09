@@ -247,9 +247,9 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(6.dp)
+                                contentPadding = PaddingValues(8.dp)
                             ) {
-                                Text("📋 Clone", fontSize = 11.sp)
+                                Text("Clone", fontSize = 12.sp)
                             }
 
                             // Move up
@@ -265,9 +265,9 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
                                 },
                                 enabled = index > 0,
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(6.dp)
+                                contentPadding = PaddingValues(8.dp)
                             ) {
-                                Text("↑", fontSize = 11.sp)
+                                Text("↑ Up", fontSize = 12.sp)
                             }
 
                             // Move down
@@ -283,9 +283,9 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
                                 },
                                 enabled = index < alarms.size - 1,
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(6.dp)
+                                contentPadding = PaddingValues(8.dp)
                             ) {
-                                Text("↓", fontSize = 11.sp)
+                                Text("↓ Down", fontSize = 12.sp)
                             }
 
                             // Remove
@@ -299,9 +299,9 @@ fun MainScreen(onScheduleAlarm: (Long, Int) -> Unit) {
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = Color.Red
                                 ),
-                                contentPadding = PaddingValues(6.dp)
+                                contentPadding = PaddingValues(8.dp)
                             ) {
-                                Text("🗑️", fontSize = 11.sp)
+                                Text("Remove", fontSize = 12.sp)
                             }
                         }
                     }
@@ -336,6 +336,18 @@ fun AlarmCard(
     var minutes by remember { mutableStateOf(alarm.minutes) }
     var seconds by remember { mutableStateOf(alarm.seconds) }
     
+    // Auto-reset alarm when time has passed
+    LaunchedEffect(alarm.isActive, alarm.scheduledTime) {
+        if (alarm.isActive && alarm.scheduledTime > 0) {
+            val remaining = alarm.scheduledTime - System.currentTimeMillis()
+            if (remaining > 0) {
+                delay(remaining)
+            }
+            // Reset alarm after it triggers
+            onUpdate(alarm.copy(isActive = false, scheduledTime = 0L))
+        }
+    }
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -345,7 +357,7 @@ fun AlarmCard(
         onClick = { expanded = !expanded }
     ) {
         Column(
-            modifier = Modifier.padding(12.dp)
+            modifier = Modifier.padding(14.dp)
         ) {
             // Header (always visible)
             Row(
@@ -357,20 +369,20 @@ fun AlarmCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "#${index + 1}",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = Color.Gray,
-                            modifier = Modifier.padding(end = 6.dp)
+                            modifier = Modifier.padding(end = 8.dp)
                         )
                         Text(
                             text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
-                            fontSize = 14.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (alarm.isActive) Color(0xFFE65100) else Color.Black
                         )
                     }
                     Text(
                         text = alarm.getFormattedTime(),
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         color = Color.Gray
                     )
                     if (alarm.isActive) {
@@ -381,7 +393,7 @@ fun AlarmCard(
                             val s = remaining % 60
                             Text(
                                 text = "⏱️ ${String.format("%02d:%02d:%02d", h, m, s)} remaining",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = Color(0xFFE65100)
                             )
                         }
@@ -392,17 +404,17 @@ fun AlarmCard(
                     imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = if (expanded) "Collapse" else "Expand",
                     tint = Color.Gray,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
             // Expanded content
             if (expanded) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 Divider()
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 // Name field
                 OutlinedTextField(
@@ -412,15 +424,15 @@ fun AlarmCard(
                         onUpdate(alarm.copy(name = it))
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Name (optional)", fontSize = 10.sp) },
-                    placeholder = { Text("e.g., First Medicine", fontSize = 12.sp) },
+                    label = { Text("Name (optional)", fontSize = 12.sp) },
+                    placeholder = { Text("e.g., First Medicine", fontSize = 14.sp) },
                     singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Time picker - more compact
+                // Time picker
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
@@ -429,27 +441,27 @@ fun AlarmCard(
                     CompactTimePickerColumn(
                         value = hours,
                         range = 0..23,
-                        label = "H",
+                        label = "Hours",
                         onValueChange = { 
                             hours = it
                             onUpdate(alarm.copy(hours = it, isActive = false, scheduledTime = 0L))
                         }
                     )
-                    Text(":", fontSize = 18.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 2.dp))
+                    Text(":", fontSize = 24.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 4.dp))
                     CompactTimePickerColumn(
                         value = minutes,
                         range = 0..59,
-                        label = "M",
+                        label = "Min",
                         onValueChange = { 
                             minutes = it
                             onUpdate(alarm.copy(minutes = it, isActive = false, scheduledTime = 0L))
                         }
                     )
-                    Text(":", fontSize = 18.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 2.dp))
+                    Text(":", fontSize = 24.sp, color = Color(0xFF6200EE), modifier = Modifier.padding(horizontal = 4.dp))
                     CompactTimePickerColumn(
                         value = seconds,
                         range = 0..59,
-                        label = "S",
+                        label = "Sec",
                         onValueChange = { 
                             seconds = it
                             onUpdate(alarm.copy(seconds = it, isActive = false, scheduledTime = 0L))
@@ -457,11 +469,11 @@ fun AlarmCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Quick presets - compact
+                // Quick presets
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     listOf(
@@ -478,16 +490,16 @@ fun AlarmCard(
                                 onUpdate(alarm.copy(hours = time.first, minutes = time.second, seconds = time.third, isActive = false, scheduledTime = 0L))
                             },
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(2.dp)
+                            contentPadding = PaddingValues(8.dp)
                         ) {
-                            Text(label, fontSize = 9.sp)
+                            Text(label, fontSize = 12.sp)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Start button only
+                // Start button
                 Button(
                     onClick = {
                         val delayMillis = alarm.getTotalSeconds() * 1000L
@@ -498,16 +510,16 @@ fun AlarmCard(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF6200EE)
                     ),
-                    contentPadding = PaddingValues(10.dp)
+                    contentPadding = PaddingValues(12.dp)
                 ) {
-                    Text("Start Alarm", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Start Alarm", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 }
 
-// New compact time picker column
+// Compact time picker column (made slightly larger for readability)
 @Composable
 fun CompactTimePickerColumn(
     value: Int,
@@ -517,21 +529,21 @@ fun CompactTimePickerColumn(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(50.dp)
+        modifier = Modifier.width(60.dp)
     ) {
         IconButton(
             onClick = { 
                 val newValue = if (value < range.last) value + 1 else range.first
                 onValueChange(newValue)
             },
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(34.dp)
         ) {
-            Text("▲", fontSize = 10.sp, color = Color(0xFF6200EE))
+            Text("▲", fontSize = 13.sp, color = Color(0xFF6200EE))
         }
 
         Text(
             text = String.format("%02d", value),
-            fontSize = 20.sp,
+            fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF6200EE)
         )
@@ -541,14 +553,14 @@ fun CompactTimePickerColumn(
                 val newValue = if (value > range.first) value - 1 else range.last
                 onValueChange(newValue)
             },
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(34.dp)
         ) {
-            Text("▼", fontSize = 10.sp, color = Color(0xFF6200EE))
+            Text("▼", fontSize = 13.sp, color = Color(0xFF6200EE))
         }
 
         Text(
             text = label,
-            fontSize = 9.sp,
+            fontSize = 11.sp,
             color = Color.Gray
         )
     }
