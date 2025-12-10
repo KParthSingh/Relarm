@@ -12,6 +12,16 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("AlarmReceiver", "Alarm triggered!")
 
+        // Check if we're in a chain - if so, ChainService will handle the alarm
+        val chainManager = ChainManager(context)
+        if (chainManager.isChainActive()) {
+            Log.d("AlarmReceiver", "Chain is active - ChainService will handle this alarm, skipping AlarmReceiver")
+            return
+        }
+
+        // Not in a chain - this is a standalone alarm, proceed normally
+        Log.d("AlarmReceiver", "Standalone alarm detected, proceeding with alarm service")
+        
         // Acquire wake lock to ensure device wakes up
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(

@@ -96,8 +96,17 @@ class ChainService : Service() {
         // Set alarm ringing state
         ChainManager(this).setAlarmRinging(true)
         
+        // Get current alarm's sound URI
+        val repository = AlarmRepository(this)
+        val alarms = repository.loadAlarms()
+        val soundUri = if (currentIndex < alarms.size) {
+            alarms[currentIndex].soundUri
+        } else null
+        
         // THIRD: Start alarm sound service (which will create its own ALARM notification)
-        val serviceIntent = Intent(this, AlarmService::class.java)
+        val serviceIntent = Intent(this, AlarmService::class.java).apply {
+            putExtra("soundUri", soundUri)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
         } else {

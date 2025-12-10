@@ -26,21 +26,54 @@ class AlarmService : Service() {
         // Start as foreground service with ALARM notification
         val notification = NotificationHelper.buildAlarmNotification(this)
         startForeground(NotificationHelper.NOTIFICATION_ID, notification)
-
-        // Start playing alarm sound
-        playAlarmSound()
+    }
+    
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("AlarmService", "onStartCommand with action: ${intent?.action}")
         
-        // Start vibration
-        startVibration()
+        // Handle restore notification if user tries to swipe it away
+        if (intent?.action == "RESTORE_NOTIFICATION") {
+            Log.d("AlarmService", "Restoring notification after swipe attempt")
+            val notification = NotificationHelper.buildAlarmNotification(this)
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.notify(NotificationHelper.NOTIFICATION_ID, notification)
+        } else {
+            // Get custom sound URI if provided
+            val soundUri = intent?.getStringExtra("soundUri")
+            Log.d("AlarmService", "Starting with sound URI: $soundUri")
+            
+            // Start playing alarm sound
+            playAlarmSound(soundUri)
+            
+            // Start vibration
+            startVibration()
+        }
+        
+        return START_NOT_STICKY
     }
 
-    private fun playAlarmSound() {
+    private fun playAlarmSound(customSoundUri: String? = null) {
         try {
-            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            // Determine which URI to use
+            val soundUri = if (customSoundUri != null) {
+                try {
+                    android.net.Uri.parse(customSoundUri)
+                } catch (e: Exception) {
+                    Log.e("AlarmService", "Invalid custom sound URI, using default", e)
+                    null
+                }
+            } else {
+                null
+            }
+            
+            // Use custom sound if valid, otherwise use default
+            val finalUri = soundUri ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            
+            Log.d("AlarmService", "Playing alarm sound from URI: $finalUri")
 
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(applicationContext, alarmUri)
+                setDataSource(applicationContext, finalUri)
                 
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
@@ -52,9 +85,26 @@ class AlarmService : Service() {
                 prepare()
                 start()
             }
-            Log.d("AlarmService", "Alarm sound started")
+            Log.d("AlarmService", "Alarm sound started successfully")
         } catch (e: Exception) {
             Log.e("AlarmService", "Error playing alarm sound", e)
+            // If all else fails, try system default as last resort
+            try {
+                mediaPlayer = MediaPlayer().apply {
+                    val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    setDataSource(applicationContext, defaultUri)
+                    setAudioAttributes(AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build())
+                    isLooping = true
+                    prepare()
+                    start()
+                }
+                Log.d("AlarmService", "Fallback to default sound successful")
+            } catch (fallbackException: Exception) {
+                Log.e("AlarmService", "Failed to play any alarm sound", fallbackException)
+            }
         }
     }
 
@@ -89,33 +139,33 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("AlarmService", "Service destroyed")
+        Log.d("AlarmService", "Service destroyed - stopping sound and vibration")
         
         // Stop media player
-        mediaPlayer?.apply {
-            if (isPlaying) stop()
-            release()
+        try {
+            mediaPlayer?.apply {
+                if (isPlaying) {
+                    stop()
+                    Log.d("AlarmService", "MediaPlayer stopped")
+                }
+                reset()
+                release()
+                Log.d("AlarmService", "MediaPlayer released")
+            }
+        } catch (e: Exception) {
+            Log.e("AlarmService", "Error stopping MediaPlayer", e)
         }
         mediaPlayer = null
 
         // Stop vibration
-        vibrator?.cancel()
+        try {
+            vibrator?.cancel()
+            Log.d("AlarmService", "Vibration canceled")
+        } catch (e: Exception) {
+            Log.e("AlarmService", "Error stopping vibration", e)
+        }
         vibrator = null
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d("AlarmService", "onStartCommand with action: ${intent?.action}")
-        
-        // Handle restore notification if user tries to swipe it away
-        if (intent?.action == "RESTORE_NOTIFICATION") {
-            Log.d("AlarmService", "Restoring notification after swipe attempt")
-            val notification = NotificationHelper.buildAlarmNotification(this)
-            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
-            notificationManager.notify(NotificationHelper.NOTIFICATION_ID, notification)
-        }
-        
-        return START_NOT_STICKY
-    }
 }

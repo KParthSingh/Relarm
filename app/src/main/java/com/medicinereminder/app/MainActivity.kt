@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -694,7 +695,29 @@ fun EditAlarmContent(
     onUpdate: (Alarm) -> Unit,
     onSchedule: (Long) -> Unit
 ) {
+    val context = LocalContext.current
     var showTimePicker by remember { mutableStateOf(false) }
+    
+    // Sound picker launcher
+    val soundPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            onUpdate(alarm.copy(soundUri = uri?.toString()))
+        }
+    }
+    
+    // Helper to get sound name
+    fun getSoundName(uri: String?): String {
+        if (uri == null) return "Default Alarm Sound"
+        return try {
+            val ringtone = RingtoneManager.getRingtone(context, Uri.parse(uri))
+            ringtone.getTitle(context)
+        } catch (e: Exception) {
+            "Custom Sound"
+        }
+    }
     
     Column {
         OutlinedTextField(
@@ -715,6 +738,29 @@ fun EditAlarmContent(
             Icon(Icons.Default.MoreVert, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(alarm.getFormattedTime())
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // Sound selector button
+        OutlinedButton(
+            onClick = {
+                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
+                    alarm.soundUri?.let { uri ->
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(uri))
+                    }
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                }
+                soundPickerLauncher.launch(intent)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.MoreVert, null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(getSoundName(alarm.soundUri))
         }
         
         Spacer(modifier = Modifier.height(12.dp))

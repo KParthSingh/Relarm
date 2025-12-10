@@ -9,7 +9,8 @@ data class Alarm(
     val minutes: Int = 0,
     val seconds: Int = 5,
     val isActive: Boolean = false,
-    val scheduledTime: Long = 0L
+    val scheduledTime: Long = 0L,
+    val soundUri: String? = null // URI of custom alarm sound, null = use default
 ) {
     fun getTotalSeconds(): Int = hours * 3600 + minutes * 60 + seconds
     
