@@ -1,8 +1,9 @@
-# Gradle build directories and IDE junk (the stuff you never want)
+# CRITICAL: EXCLUDE LOCAL CONFIGURATION!
+local.properties
+
+# Files and folders to exclude that usually shouldn't be tracked
 /build/
+/app/build/
 .gradle/
 .idea/
 *.iml
-
-# Specific folders inside app that may cause trouble (like that tmp folder)
-/app/build/
