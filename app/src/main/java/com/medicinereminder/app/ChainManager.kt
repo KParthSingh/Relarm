@@ -12,6 +12,7 @@ class ChainManager(private val context: Context) {
         private const val KEY_REMAINING_TIME = "remaining_time"
         private const val KEY_CURRENT_REMAINING = "current_remaining_time"
         private const val KEY_IS_ALARM_RINGING = "is_alarm_ringing"
+        private const val KEY_END_TIME = "end_time"
     }
     
     fun startChain() {
@@ -87,6 +88,7 @@ class ChainManager(private val context: Context) {
             .apply()
     }
     
+    
     fun isAlarmRinging(): Boolean {
         return prefs.getBoolean(KEY_IS_ALARM_RINGING, false)
     }
@@ -95,5 +97,16 @@ class ChainManager(private val context: Context) {
         prefs.edit()
             .putBoolean(KEY_IS_ALARM_RINGING, isRinging)
             .apply()
+    }
+    
+    // Store absolute end time for battery optimization
+    fun setEndTime(endTimeMs: Long) {
+        prefs.edit()
+            .putLong(KEY_END_TIME, endTimeMs)
+            .apply()
+    }
+    
+    fun getEndTime(): Long {
+        return prefs.getLong(KEY_END_TIME, 0L)
     }
 }

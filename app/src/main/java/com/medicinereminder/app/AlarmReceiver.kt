@@ -12,10 +12,21 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("AlarmReceiver", "Alarm triggered!")
 
-        // Check if we're in a chain - if so, ChainService will handle the alarm
+        // Check if we're in a chain - if so, notify ChainService to trigger the alarm
         val chainManager = ChainManager(context)
         if (chainManager.isChainActive()) {
-            Log.d("AlarmReceiver", "Chain is active - ChainService will handle this alarm, skipping AlarmReceiver")
+            Log.d("AlarmReceiver", "Chain is active - Notifying ChainService to trigger alarm")
+            
+            // Send intent to ChainService to trigger the alarm
+            // This is important for battery optimization when countdown loop is paused
+            val serviceIntent = Intent(context, ChainService::class.java).apply {
+                action = ChainService.ACTION_TRIGGER_ALARM
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
             return
         }
 

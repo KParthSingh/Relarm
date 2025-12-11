@@ -17,10 +17,13 @@ class ChainService : Service() {
     private var currentAlarmName: String = ""
     private var notificationDismissed: Boolean = false
     private var isDismissableMode: Boolean = false
+    
+    // Synchronization lock to prevent double alarm triggers
+    @Volatile
+    private var isAlarmTriggering: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("ChainService", "Chain service created")
         NotificationHelper.createNotificationChannel(this)
     }
 
@@ -37,6 +40,10 @@ class ChainService : Service() {
         if (resetDismissalState) {
             notificationDismissed = false
         }
+        
+        // Store endTime in ChainManager for recalculation after backgrounding
+        ChainManager(this).setEndTime(endTime)
+        Log.d("BatteryOpt", "Countdown started - endTime stored: $endTime, hideCounter: $isDismissableMode")
         
         // Start as foreground service with initial notification
         updateChainManager()
@@ -62,7 +69,6 @@ class ChainService : Service() {
             
             if (isActive) {
                 // Countdown finished, trigger the alarm
-                Log.d("ChainService", "Countdown finished, triggering alarm")
                 triggerAlarm()
             }
         }
@@ -97,7 +103,6 @@ class ChainService : Service() {
         if (!isNotificationActive) {
             // User dismissed it
             notificationDismissed = true
-            Log.d("ChainService", "Notification dismissed by user")
             return false
         }
         
@@ -116,23 +121,41 @@ class ChainService : Service() {
         )
         
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
         
-        // Use foreground service only in non-dismissable mode
-        if (!isDismissableMode) {
-            try {
-                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-                } else {
-                    startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
-                }
-            } catch (e: Exception) {
-                Log.e("ChainService", "Error starting foreground", e)
+        // IMPORTANT: Always call startForeground() first to satisfy Android requirement
+        // when service is started with startForegroundService()
+        try {
+             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
             }
+        } catch (e: Exception) {
+            Log.e("ChainService", "Error starting foreground", e)
+        }
+        
+        // If in dismissable mode, immediately stop foreground to hide notification
+        if (isDismissableMode) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            Log.d("BatteryOpt", "Notification hidden (dismissable mode ON)")
         }
     }
     
     private fun triggerAlarm() {
+        // CRITICAL: Prevent double triggering (AlarmManager + countdown loop could both call this)
+        synchronized(this) {
+            if (isAlarmTriggering) {
+                Log.w("ChainService", "triggerAlarm() already in progress - skipping duplicate call")
+                return
+            }
+            isAlarmTriggering = true
+        }
+        
         Log.d("ChainService", "triggerAlarm() - Exiting foreground mode")
         
         // FIRST: Cancel the countdown job to stop any further notification updates
@@ -149,8 +172,17 @@ class ChainService : Service() {
             stopForeground(true)
         }
         
+        // THIRD: Check if we're in a chain
+        val chainManager = ChainManager(this)
+        if (!chainManager.isChainActive()) {
+            Log.w("ChainService", "Chain not active in triggerAlarm, stopping service")
+            // Reset flag before returning
+            isAlarmTriggering = false
+            return
+        }
+        
         // Set alarm ringing state
-        ChainManager(this).setAlarmRinging(true)
+        chainManager.setAlarmRinging(true)
         
         // Get current alarm's sound URI
         val repository = AlarmRepository(this)
@@ -168,6 +200,10 @@ class ChainService : Service() {
         } else {
             startService(serviceIntent)
         }
+        
+        // Reset the triggering flag now that alarm has been started
+        // Next alarm in sequence can trigger after this one is dismissed
+        isAlarmTriggering = false
     }
 
     override fun onDestroy() {
@@ -191,6 +227,9 @@ class ChainService : Service() {
         const val ACTION_RESUME_CHAIN = "com.medicinereminder.app.RESUME_CHAIN"
         const val ACTION_NEXT_ALARM = "com.medicinereminder.app.NEXT_ALARM"
         const val ACTION_PREV_ALARM = "com.medicinereminder.app.PREV_ALARM"
+        const val ACTION_PAUSE_COUNTDOWN_LOOP = "com.medicinereminder.app.PAUSE_COUNTDOWN_LOOP"
+        const val ACTION_RESUME_COUNTDOWN_LOOP = "com.medicinereminder.app.RESUME_COUNTDOWN_LOOP"
+        const val ACTION_TRIGGER_ALARM = "com.medicinereminder.app.TRIGGER_ALARM"
         
         const val EXTRA_END_TIME = "end_time"
         const val EXTRA_CURRENT_INDEX = "current_index"
@@ -266,6 +305,39 @@ class ChainService : Service() {
             ACTION_PREV_ALARM -> {
                 Log.d("ChainService", ">>> ACTION_PREV_ALARM received")
                 handlePrevAlarm()
+            }
+            ACTION_PAUSE_COUNTDOWN_LOOP -> {
+                Log.d("ChainService", ">>> ACTION_PAUSE_COUNTDOWN_LOOP received")
+                handlePauseCountdownLoop()
+            }
+            ACTION_RESUME_COUNTDOWN_LOOP -> {
+                Log.d("ChainService", ">>> ACTION_RESUME_COUNTDOWN_LOOP received")
+                handleResumeCountdownLoop()
+            }
+            ACTION_TRIGGER_ALARM -> {
+                Log.d("BatteryOpt", "[TRIGGER] AlarmManager triggered alarm - Calling triggerAlarm()")
+                
+                // CRITICAL: Must call startForeground() when service started with startForegroundService()
+                // Create temporary notification just to satisfy Android requirement
+                val tempNotification = NotificationHelper.buildChainNotification(
+                    this,
+                    currentIndex + 1,
+                    totalAlarms,
+                    0,
+                    currentAlarmName
+                )
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, tempNotification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                    } else {
+                        startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, tempNotification)
+                    }
+                } catch (e: Exception) {
+                    Log.e("ChainService", "Error starting foreground in TRIGGER_ALARM", e)
+                }
+                
+                // Now trigger the alarm (which will exit foreground and start AlarmService)
+                triggerAlarm()
             }
             else -> {
                 Log.w("ChainService", "Unknown action received: ${intent?.action}")
@@ -445,5 +517,81 @@ class ChainService : Service() {
         } else {
             Log.d("ChainService", "Already at first alarm, cannot go back")
         }
+    }
+    
+    private fun handlePauseCountdownLoop() {
+        Log.d("BatteryOpt", "[PAUSE] Stopping countdown loop - App backgrounded with hideCounter=ON")
+        
+        // CRITICAL: Only pause if chain is actually active
+        val chainManager = ChainManager(this)
+        if (!chainManager.isChainActive()) {
+            Log.d("BatteryOpt", "[PAUSE] Chain not active - Skipping pause")
+            return
+        }
+        
+        Log.d("BatteryOpt", "[PAUSE] Remaining time: ${getRemainingTime()}s, endTime: $endTime")
+        
+        // Cancel countdown job to stop polling every second
+        countdownJob?.cancel()
+        countdownJob = null
+        
+        Log.d("BatteryOpt", "[PAUSE] Countdown loop paused - AlarmManager alarm will still trigger at correct time")
+    }
+    
+    private fun handleResumeCountdownLoop() {
+        Log.d("BatteryOpt", "[RESUME] App foregrounded - Resuming countdown loop")
+        
+        // CRITICAL: Only resume if chain is actually active
+        val chainManager = ChainManager(this)
+        if (!chainManager.isChainActive()) {
+            Log.d("BatteryOpt", "[RESUME] Chain not active - Skipping resume")
+            return
+        }
+        
+        // Reload state from ChainManager to ensure we have current data
+        currentIndex = chainManager.getCurrentIndex()
+        val repository = AlarmRepository(this)
+        val alarms = repository.loadAlarms()
+        totalAlarms = alarms.size
+        currentAlarmName = if (currentIndex < alarms.size) alarms[currentIndex].name else ""
+        
+        // Recalculate remaining time from stored endTime
+        val storedEndTime = ChainManager(this).getEndTime()
+        if (storedEndTime == 0L) {
+            Log.w("BatteryOpt", "[RESUME] ERROR: No stored endTime found!")
+            return
+        }
+        
+        // Update local endTime
+        endTime = storedEndTime
+        
+        val currentTime = System.currentTimeMillis()
+        val remainingMs = (endTime - currentTime).coerceAtLeast(0)
+        val remainingSec = (remainingMs / 1000).toInt()
+        
+        Log.d("BatteryOpt", "[RESUME] Recalculated - Remaining: ${remainingSec}s, endTime: $endTime, currentTime: $currentTime")
+        
+        // Recalculate and update ChainManager with current remaining time
+        updateChainManager()
+        
+        // Restart countdown loop
+        countdownJob?.cancel()
+        countdownJob = serviceScope.launch {
+            while (isActive && System.currentTimeMillis() < endTime) {
+                delay(1000)
+                if (!isActive) break
+                
+                // ALWAYS update ChainManager for UI
+                updateChainManager()
+                
+                // Don't show notification (hide counter is ON)
+            }
+            
+            if (isActive) {
+                Log.d("BatteryOpt", "[RESUME] Countdown finished after resume - Triggering alarm")
+                triggerAlarm()
+            }
+        }
+        Log.d("BatteryOpt", "[RESUME] Countdown loop resumed successfully")
     }
 }

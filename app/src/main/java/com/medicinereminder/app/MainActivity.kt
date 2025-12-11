@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -93,6 +94,38 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+    
+    override fun onStop() {
+        super.onStop()
+        // App going to background - pause countdown loop if hide counter is ON
+        val settingsRepository = SettingsRepository(this)
+        val hideCounter = settingsRepository.getDismissableCounter()
+        
+        Log.d("BatteryOpt", "[LIFECYCLE] App going to background - hideCounter: $hideCounter")
+        
+        if (hideCounter) {
+            val intent = Intent(this, ChainService::class.java).apply {
+                action = ChainService.ACTION_PAUSE_COUNTDOWN_LOOP
+            }
+            startService(intent)
+        }
+    }
+    
+    override fun onStart() {
+        super.onStart()
+        // App coming to foreground - resume countdown loop if hide counter is ON
+        val settingsRepository = SettingsRepository(this)
+        val hideCounter = settingsRepository.getDismissableCounter()
+        
+        Log.d("BatteryOpt", "[LIFECYCLE] App coming to foreground - hideCounter: $hideCounter")
+        
+        if (hideCounter) {
+            val intent = Intent(this, ChainService::class.java).apply {
+                action = ChainService.ACTION_RESUME_COUNTDOWN_LOOP
+            }
+            startService(intent)
         }
     }
 
