@@ -11,27 +11,6 @@ import android.util.Log
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("AlarmReceiver", "Alarm triggered!")
-
-        // Check if we're in a chain - if so, notify ChainService to trigger the alarm
-        val chainManager = ChainManager(context)
-        if (chainManager.isChainActive()) {
-            Log.d("AlarmReceiver", "Chain is active - Notifying ChainService to trigger alarm")
-            
-            // Send intent to ChainService to trigger the alarm
-            // This is important for battery optimization when countdown loop is paused
-            val serviceIntent = Intent(context, ChainService::class.java).apply {
-                action = ChainService.ACTION_TRIGGER_ALARM
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
-            return
-        }
-
-        // Not in a chain - this is a standalone alarm, proceed normally
-        Log.d("AlarmReceiver", "Standalone alarm detected, proceeding with alarm service")
         
         // Acquire wake lock to ensure device wakes up
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -44,6 +23,28 @@ class AlarmReceiver : BroadcastReceiver() {
         wakeLock.acquire(10 * 60 * 1000L) // 10 minutes max
 
         try {
+            // Check if we're in a chain - if so, notify ChainService to trigger the alarm
+            val chainManager = ChainManager(context)
+            if (chainManager.isChainActive()) {
+                Log.d("AlarmReceiver", "Chain is active - Notifying ChainService to trigger alarm")
+                
+                // Send intent to ChainService to trigger the alarm
+                val serviceIntent = Intent(context, ChainService::class.java).apply {
+                    action = ChainService.ACTION_TRIGGER_ALARM
+                }
+                
+                // CRITICAL: Must start as foreground service to ensure it runs even in background
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+                return
+            }
+
+            // Not in a chain - this is a standalone alarm, proceed normally
+            Log.d("AlarmReceiver", "Standalone alarm detected, proceeding with alarm service")
+            
             // Start foreground service (it will show the notification with STOP button)
             val serviceIntent = Intent(context, AlarmService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

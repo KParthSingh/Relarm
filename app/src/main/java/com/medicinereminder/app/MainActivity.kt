@@ -466,7 +466,16 @@ fun StickyChainBar(
     
     LaunchedEffect(Unit) {
         while (true) {
-            remainingTimeMs = chainManager.getCurrentRemainingTime()
+            if (chainManager.isChainPaused()) {
+                remainingTimeMs = chainManager.getPausedRemainingTime()
+            } else {
+                val endTime = chainManager.getEndTime()
+                if (endTime > 0) {
+                    remainingTimeMs = (endTime - System.currentTimeMillis()).coerceAtLeast(0)
+                } else {
+                    remainingTimeMs = 0
+                }
+            }
             delay(100) // Poll frequently for smooth updates
         }
     }

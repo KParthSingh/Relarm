@@ -10,7 +10,7 @@ import kotlinx.coroutines.*
 
 class ChainService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var countdownJob: Job? = null
+    // REMOVED: countdownJob - no more polling loop!
     private var endTime: Long = 0
     private var currentIndex: Int = 0
     private var totalAlarms: Int = 0
@@ -43,35 +43,17 @@ class ChainService : Service() {
         
         // Store endTime in ChainManager for recalculation after backgrounding
         ChainManager(this).setEndTime(endTime)
-        Log.d("BatteryOpt", "Countdown started - endTime stored: $endTime, hideCounter: $isDismissableMode")
+        Log.d("BatteryOpt", "Timer started - endTime stored: $endTime, hideCounter: $isDismissableMode")
         
         // Start as foreground service with initial notification
-        updateChainManager()
+        // No loop needed! System Chronometer handles the UI.
+        ChainManager(this).setCurrentRemainingTime(((endTime - System.currentTimeMillis()) / 1000).toInt() * 1000L) // Initial sync
         if (shouldShowNotification()) {
             showNotification()
         }
-
-        // Start countdown updates
-        countdownJob?.cancel()
-        countdownJob = serviceScope.launch {
-            while (isActive && System.currentTimeMillis() < endTime) {
-                delay(1000)
-                if (!isActive) break
-                
-                // ALWAYS update ChainManager for UI
-                updateChainManager()
-                
-                // Conditionally show notification
-                if (shouldShowNotification()) {
-                    showNotification()
-                }
-            }
-            
-            if (isActive) {
-                // Countdown finished, trigger the alarm
-                triggerAlarm()
-            }
-        }
+        
+        // The Service now just sits IDLE (or minimal memory) waiting for AlarmManager to trigger 'ACTION_TRIGGER_ALARM'
+        // No wakelocks, no CPU usage.
     }
     
     // Single source of truth for remaining time
@@ -79,7 +61,7 @@ class ChainService : Service() {
         return ((endTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
     }
     
-    // Always update ChainManager - keeps UI timer alive
+    // DEPRECATED: UI should calculate own time. Kept only for initial sync if needed.
     private fun updateChainManager() {
         ChainManager(this).setCurrentRemainingTime(getRemainingTime() * 1000L)
     }
@@ -115,7 +97,7 @@ class ChainService : Service() {
             this,
             currentIndex + 1,
             totalAlarms,
-            getRemainingTime(),
+            endTime, // Pass endTime for Chronometer
             currentAlarmName,
             isPaused
         )
@@ -158,9 +140,8 @@ class ChainService : Service() {
         
         Log.d("ChainService", "triggerAlarm() - Exiting foreground mode")
         
-        // FIRST: Cancel the countdown job to stop any further notification updates
-        countdownJob?.cancel()
-        countdownJob = null
+        // FIRST: No loop to cancel anymore
+        // countdownJob?.cancel()
         
         // SECOND: Exit foreground mode and remove the notification
         // This is KEY - while ChainService is foreground, Android keeps the notification alive
@@ -208,7 +189,7 @@ class ChainService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        countdownJob?.cancel()
+        // countdownJob?.cancel()
         serviceScope.cancel()
         
         // Cancel only our unified notification
@@ -323,7 +304,7 @@ class ChainService : Service() {
                     this,
                     currentIndex + 1,
                     totalAlarms,
-                    0,
+                    System.currentTimeMillis(), // Show 00:00 or expired time
                     currentAlarmName
                 )
                 try {
@@ -349,8 +330,8 @@ class ChainService : Service() {
 
     private fun handlePause() {
         Log.d("ChainService", "handlePause() called")
-        Log.d("ChainService", "Canceling countdown job...")
-        countdownJob?.cancel()
+        // No loop to cancel
+        // countdownJob?.cancel()
         
         // CRITICAL: Cancel the scheduled AlarmManager alarm!
         val alarmScheduler = AlarmScheduler(this)
@@ -409,8 +390,8 @@ class ChainService : Service() {
         val stopAlarmIntent = Intent(this, AlarmService::class.java)
         stopService(stopAlarmIntent)
         
-        // Cancel current countdown
-        countdownJob?.cancel()
+        // No loop to cancel
+        // countdownJob?.cancel()
         
         // Cancel scheduled alarm
         val alarmScheduler = AlarmScheduler(this)
@@ -471,8 +452,8 @@ class ChainService : Service() {
         val stopAlarmIntent = Intent(this, AlarmService::class.java)
         stopService(stopAlarmIntent)
         
-        // Cancel current countdown
-        countdownJob?.cancel()
+        // No loop to cancel
+        // countdownJob?.cancel()
         
         // Cancel scheduled alarm
         val alarmScheduler = AlarmScheduler(this)
@@ -520,78 +501,12 @@ class ChainService : Service() {
     }
     
     private fun handlePauseCountdownLoop() {
-        Log.d("BatteryOpt", "[PAUSE] Stopping countdown loop - App backgrounded with hideCounter=ON")
-        
-        // CRITICAL: Only pause if chain is actually active
-        val chainManager = ChainManager(this)
-        if (!chainManager.isChainActive()) {
-            Log.d("BatteryOpt", "[PAUSE] Chain not active - Skipping pause")
-            return
-        }
-        
-        Log.d("BatteryOpt", "[PAUSE] Remaining time: ${getRemainingTime()}s, endTime: $endTime")
-        
-        // Cancel countdown job to stop polling every second
-        countdownJob?.cancel()
-        countdownJob = null
-        
-        Log.d("BatteryOpt", "[PAUSE] Countdown loop paused - AlarmManager alarm will still trigger at correct time")
+        Log.d("BatteryOpt", "[PAUSE] No-op: Polling loop removed for optimization")
+        // No loop to pause, Service is already efficient
     }
     
     private fun handleResumeCountdownLoop() {
-        Log.d("BatteryOpt", "[RESUME] App foregrounded - Resuming countdown loop")
-        
-        // CRITICAL: Only resume if chain is actually active
-        val chainManager = ChainManager(this)
-        if (!chainManager.isChainActive()) {
-            Log.d("BatteryOpt", "[RESUME] Chain not active - Skipping resume")
-            return
-        }
-        
-        // Reload state from ChainManager to ensure we have current data
-        currentIndex = chainManager.getCurrentIndex()
-        val repository = AlarmRepository(this)
-        val alarms = repository.loadAlarms()
-        totalAlarms = alarms.size
-        currentAlarmName = if (currentIndex < alarms.size) alarms[currentIndex].name else ""
-        
-        // Recalculate remaining time from stored endTime
-        val storedEndTime = ChainManager(this).getEndTime()
-        if (storedEndTime == 0L) {
-            Log.w("BatteryOpt", "[RESUME] ERROR: No stored endTime found!")
-            return
-        }
-        
-        // Update local endTime
-        endTime = storedEndTime
-        
-        val currentTime = System.currentTimeMillis()
-        val remainingMs = (endTime - currentTime).coerceAtLeast(0)
-        val remainingSec = (remainingMs / 1000).toInt()
-        
-        Log.d("BatteryOpt", "[RESUME] Recalculated - Remaining: ${remainingSec}s, endTime: $endTime, currentTime: $currentTime")
-        
-        // Recalculate and update ChainManager with current remaining time
-        updateChainManager()
-        
-        // Restart countdown loop
-        countdownJob?.cancel()
-        countdownJob = serviceScope.launch {
-            while (isActive && System.currentTimeMillis() < endTime) {
-                delay(1000)
-                if (!isActive) break
-                
-                // ALWAYS update ChainManager for UI
-                updateChainManager()
-                
-                // Don't show notification (hide counter is ON)
-            }
-            
-            if (isActive) {
-                Log.d("BatteryOpt", "[RESUME] Countdown finished after resume - Triggering alarm")
-                triggerAlarm()
-            }
-        }
-        Log.d("BatteryOpt", "[RESUME] Countdown loop resumed successfully")
+        Log.d("BatteryOpt", "[RESUME] No-op: Polling loop removed for optimization")
+        // No loop to resume, Notification Cronometer handles it
     }
 }

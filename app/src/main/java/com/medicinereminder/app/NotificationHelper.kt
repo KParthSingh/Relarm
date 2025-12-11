@@ -20,7 +20,7 @@ object NotificationHelper {
         context: Context,
         currentStep: Int,
         totalSteps: Int,
-        remainingSeconds: Int,
+        endTime: Long,
         nextAlarmName: String,
         isPaused: Boolean = false
     ): android.app.Notification {
@@ -75,17 +75,8 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val hours = remainingSeconds / 3600
-        val minutes = (remainingSeconds % 3600) / 60
-        val seconds = remainingSeconds % 60
-        
-        val timeText = if (hours > 0) String.format("%d:%02d:%02d", hours, minutes, seconds)
-                       else if (minutes > 0) String.format("%d:%02d", minutes, seconds)
-                       else "${seconds}s"
-
-
         val title = "Sequence: $currentStep of $totalSteps ${if(isPaused) "(PAUSED)" else ""}"
-        val content = if (isPaused) "Tap RESUME to continue." else "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"} in $timeText"
+        val content = if (isPaused) "Tap RESUME to continue." else "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"}"
 
         // Get settings repository for notification configuration
         val settingsRepository = SettingsRepository(context)
@@ -101,6 +92,12 @@ object NotificationHelper {
             .setOngoing(!isDismissable)  // Only ongoing if NOT dismissable
             .setOnlyAlertOnce(true)
             .setColor(Color.parseColor("#6750A4"))
+            
+        if (!isPaused) {
+            builder.setWhen(endTime)
+                   .setUsesChronometer(true)
+                   .setChronometerCountDown(true)
+        }
         
         // Add navigation buttons (Previous)
         if (currentStep > 1) {
