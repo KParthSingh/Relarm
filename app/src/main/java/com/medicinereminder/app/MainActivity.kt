@@ -20,12 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -499,12 +499,6 @@ fun StickyChainBar(
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
-                            Icon(
-                                if (isPaused) Icons.Default.PlayArrow else androidx.compose.material.icons.Icons.Default.Info,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
                             Text(if (isPaused) "RESUME" else "PAUSE")
                         }
                         
@@ -666,7 +660,7 @@ fun AlarmItem(
                     }
                     IconButton(onClick = onClone) {
                         Icon(
-                            Icons.Default.Add,
+                            Icons.Default.ContentCopy,
                             contentDescription = "Clone"
                         )
                     }
