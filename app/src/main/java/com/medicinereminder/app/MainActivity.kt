@@ -237,8 +237,12 @@ fun MainScreen(
         },
         floatingActionButton = {
             if (!isChainActive) {
+                val settingsRepository = remember { SettingsRepository(context) }
                 ExtendedFloatingActionButton(
-                    onClick = { alarms = alarms + Alarm() },
+                    onClick = { 
+                        val defaultSeconds = settingsRepository.getDefaultAlarmTime()
+                        alarms = alarms + Alarm(seconds = defaultSeconds)
+                    },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     icon = { Icon(Icons.Default.Add, "Add Alarm") },

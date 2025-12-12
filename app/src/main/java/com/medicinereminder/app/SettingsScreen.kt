@@ -115,6 +115,8 @@ fun SettingsScreen(
                             }
                         }
                     }
+                    
+
                 }
             }
             
@@ -214,6 +216,86 @@ fun SettingsScreen(
                             onCheckedChange = { enabled ->
                                 dismissableCounter = enabled
                                 repository.setDismissableCounter(enabled)
+                            }
+                        )
+                    }
+                    
+                    Divider()
+                    
+                    // Default Alarm Time Option
+                    var showTimeDialog by remember { mutableStateOf(false) }
+                    var defaultTime by remember { mutableStateOf(repository.getDefaultAlarmTime()) }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showTimeDialog = true
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                context.getString(R.string.settings_default_time),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                context.getString(R.string.settings_default_time_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            String.format("%02d:%02d:%02d", 
+                                defaultTime / 3600,
+                                (defaultTime % 3600) / 60,
+                                defaultTime % 60
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    
+                    // Time Picker Dialog
+                    if (showTimeDialog) {
+                        val hours = defaultTime / 3600
+                        val minutes = (defaultTime % 3600) / 60
+                        val seconds = defaultTime % 60
+                        
+                        AlertDialog(
+                            onDismissRequest = { showTimeDialog = false },
+                            title = {
+                                Text(context.getString(R.string.settings_default_time_dialog_title))
+                            },
+                            text = {
+                                SimpleDurationPicker(
+                                    hours = hours,
+                                    minutes = minutes,
+                                    seconds = seconds,
+                                    onTimeChange = { h, m, s ->
+                                        defaultTime = h * 3600 + m * 60 + s
+                                    }
+                                )
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        repository.setDefaultAlarmTime(defaultTime)
+                                        showTimeDialog = false
+                                    }
+                                ) {
+                                    Text("Save")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { 
+                                    defaultTime = repository.getDefaultAlarmTime()
+                                    showTimeDialog = false
+                                }) {
+                                    Text("Cancel")
+                                }
                             }
                         )
                     }

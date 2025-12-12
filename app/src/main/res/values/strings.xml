@@ -51,4 +51,7 @@
     <string name="settings_clear_data_confirm_message">This will delete all alarms, settings, and reset the app to defaults. This action cannot be undone.</string>
     <string name="settings_clear_data_confirm_yes">Clear Data</string>
     <string name="settings_clear_data_confirm_no">Cancel</string>
+    <string name="settings_default_time">Default Alarm Time</string>
+    <string name="settings_default_time_desc">Set the default duration for new alarms</string>
+    <string name="settings_default_time_dialog_title">Set Default Alarm Time</string>
 </resources>

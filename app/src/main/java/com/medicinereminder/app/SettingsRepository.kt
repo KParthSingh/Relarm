@@ -11,6 +11,7 @@ class SettingsRepository(context: Context) {
         const val KEY_HIDE_STOP_BUTTON = "hide_stop_button"
         const val KEY_DISMISSABLE_COUNTER = "dismissable_counter"
         const val KEY_BATTERY_WARNING_NEVER_SHOW = "battery_warning_never_show"
+        const val KEY_DEFAULT_ALARM_TIME = "default_alarm_time"
         
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
@@ -55,5 +56,13 @@ class SettingsRepository(context: Context) {
     
     fun setBatteryWarningNeverShow(neverShow: Boolean) {
         prefs.edit().putBoolean(KEY_BATTERY_WARNING_NEVER_SHOW, neverShow).apply()
+    }
+    
+    fun getDefaultAlarmTime(): Int {
+        return prefs.getInt(KEY_DEFAULT_ALARM_TIME, 5) // Default 5 seconds
+    }
+    
+    fun setDefaultAlarmTime(seconds: Int) {
+        prefs.edit().putInt(KEY_DEFAULT_ALARM_TIME, seconds).apply()
     }
 }
