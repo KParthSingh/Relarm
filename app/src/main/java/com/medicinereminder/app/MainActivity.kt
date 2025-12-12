@@ -947,7 +947,30 @@ fun EditAlarmContent(
         if (alarm.isActive) {
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
-                onClick = { onUpdate(alarm.copy(isActive = false, scheduledTime = 0L)) },
+                onClick = { 
+                    // Get the alarm index from the repository to determine request code
+                    val repository = AlarmRepository(context)
+                    val allAlarms = repository.loadAlarms()
+                    val alarmIndex = allAlarms.indexOf(alarm)
+                    val requestCode = alarmIndex + 1
+                    
+                    // Cancel the scheduled alarm
+                    val alarmScheduler = AlarmScheduler(context)
+                    alarmScheduler.cancelAlarm(requestCode)
+                    
+                    // Stop the ChainService (which manages the notification)
+                    val stopIntent = Intent(context, ChainService::class.java).apply {
+                        action = ChainService.ACTION_STOP_CHAIN
+                    }
+                    context.startService(stopIntent)
+                    
+                    // Clear alarm ringing state
+                    val chainManager = ChainManager(context)
+                    chainManager.setAlarmRinging(false)
+                    
+                    // Update UI state
+                    onUpdate(alarm.copy(isActive = false, scheduledTime = 0L))
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
