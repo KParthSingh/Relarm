@@ -36,9 +36,19 @@
     
     <!-- Battery Optimization Warning -->
     <string name="battery_warning_title">IMPORTANT: Enable Autostart</string>
-    <string name="battery_warning_message">"If you're seeing this message it means you're (probably) using a phone with aggressive battery management. In order for this app to run alarms in the background you should enable autostart. I'm not trying to hack into your phone okay? pinky promise."</string>
+    <string name="battery_warning_message">"If you're seeing this message it means you're (probably) using android device with aggressive battery management. In order for this app to run alarms in the background you should enable autostart. I'm not trying to hack into your phone okay? pinky promise."</string>
     <string name="battery_warning_btn_settings">Open Settings</string>
     <string name="battery_warning_btn_enabled">Autostart Enabled</string>
     <string name="battery_warning_btn_hide">Hide for now</string>
     <string name="battery_warning_btn_never">Don\'t Show Again</string>
+    
+    <!-- Settings -->
+    <string name="settings_autostart">Autostart Settings</string>
+    <string name="settings_autostart_desc">Open system autostart settings for this app</string>
+    <string name="settings_clear_data">Clear All App Data</string>
+    <string name="settings_clear_data_desc">Reset all alarms, settings, and preferences</string>
+    <string name="settings_clear_data_confirm_title">Clear All Data?</string>
+    <string name="settings_clear_data_confirm_message">This will delete all alarms, settings, and reset the app to defaults. This action cannot be undone.</string>
+    <string name="settings_clear_data_confirm_yes">Clear Data</string>
+    <string name="settings_clear_data_confirm_no">Cancel</string>
 </resources>

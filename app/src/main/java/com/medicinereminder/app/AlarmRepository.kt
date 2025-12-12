@@ -22,4 +22,8 @@ class AlarmRepository(private val context: Context) {
     fun clearAlarms() {
         prefs.edit().remove("alarm_list").apply()
     }
+    
+    fun clearAllAlarms() {
+        prefs.edit().clear().apply()
+    }
 }

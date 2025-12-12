@@ -1,5 +1,6 @@
 package com.medicinereminder.app
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -213,6 +214,116 @@ fun SettingsScreen(
                             onCheckedChange = { enabled ->
                                 dismissableCounter = enabled
                                 repository.setDismissableCounter(enabled)
+                            }
+                        )
+                    }
+                }
+            }
+            
+            // System Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "System",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    // Autostart Settings Option
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                AutostartHelper.openAutostartSettings(context)
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                context.getString(R.string.settings_autostart),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                context.getString(R.string.settings_autostart_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Clear App Data Option
+                    var showClearDialog by remember { mutableStateOf(false) }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showClearDialog = true
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                context.getString(R.string.settings_clear_data),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                context.getString(R.string.settings_clear_data_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                    
+                    // Clear Data Confirmation Dialog
+                    if (showClearDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showClearDialog = false },
+                            title = {
+                                Text(context.getString(R.string.settings_clear_data_confirm_title))
+                            },
+                            text = {
+                                Text(context.getString(R.string.settings_clear_data_confirm_message))
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        // Clear all data
+                                        AlarmRepository(context).clearAllAlarms()
+                                        context.getSharedPreferences("app_settings", android.content.Context.MODE_PRIVATE)
+                                            .edit()
+                                            .clear()
+                                            .apply()
+                                        showClearDialog = false
+                                        onNavigateBack()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text(context.getString(R.string.settings_clear_data_confirm_yes))
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showClearDialog = false }) {
+                                    Text(context.getString(R.string.settings_clear_data_confirm_no))
+                                }
                             }
                         )
                     }
