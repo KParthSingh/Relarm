@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -211,27 +212,27 @@ fun MainScreen(
         repository.saveAlarms(alarms)
     }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            CenterAlignedTopAppBar(
+            LargeTopAppBar(
                 title = { 
-                    Text(
-                        stringResource(R.string.title_main),
-                        fontWeight = FontWeight.Bold 
-                    ) 
+                    Text(stringResource(R.string.title_main))
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            contentDescription = "Settings"
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -315,42 +316,51 @@ fun MainScreen(
                 // Persistent Start Button at bottom - fills entire bottom bar
                 val anyActive = alarms.any { it.isActive }
                 val settingsRepository = remember { SettingsRepository(context) }
-                Button(
-                    onClick = {
-                        chainManager.startChain()
-                        val firstAlarm = alarms[0]
-                        val delay = firstAlarm.getTotalSeconds() * 1000L
-                        onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
-                        alarms = alarms.toMutableList().apply {
-                            set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
-                        }
-                        
-                        // Check if close-on-start is enabled
-                        if (settingsRepository.getCloseOnStart()) {
-                            // Move app to background (go to home screen)
-                            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                                addCategory(Intent.CATEGORY_HOME)
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            }
-                            context.startActivity(homeIntent)
-                        }
-                    },
-                    enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(72.dp),
-                    shape = RoundedCornerShape(0.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                Surface(
+                    shadowElevation = 8.dp,
+                    tonalElevation = 3.dp
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(stringResource(R.string.start_chain_btn), fontWeight = FontWeight.Bold)
-                        Text(
-                            stringResource(R.string.start_chain_subtitle, alarms.size),
-                            style = MaterialTheme.typography.labelSmall
+                    Button(
+                        onClick = {
+                            chainManager.startChain()
+                            val firstAlarm = alarms[0]
+                            val delay = firstAlarm.getTotalSeconds() * 1000L
+                            onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size)
+                            alarms = alarms.toMutableList().apply {
+                                set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
+                            }
+                            
+                            // Check if close-on-start is enabled
+                            if (settingsRepository.getCloseOnStart()) {
+                                // Move app to background (go to home screen)
+                                val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                                    addCategory(Intent.CATEGORY_HOME)
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(homeIntent)
+                            }
+                        },
+                        enabled = !anyActive && alarms.all { it.getTotalSeconds() > 0 },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp),
+                        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         )
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                stringResource(R.string.start_chain_btn), 
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                stringResource(R.string.start_chain_subtitle, alarms.size),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }
@@ -359,21 +369,22 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .padding(paddingValues)
-                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
         ) {
 
             // Battery Optimization Warning
             BatteryOptimizationWarning()
+            
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ALARMS LIST
             if (alarms.isEmpty()) {
                 EmptyState()
             } else {
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState()),
+                    modifier = Modifier.padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     alarms.forEachIndexed { index, alarm ->
@@ -433,18 +444,34 @@ fun EmptyState() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("😴", fontSize = 64.sp)
-            Spacer(modifier = Modifier.height(16.dp))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text(
+                "⏰",
+                fontSize = 72.sp,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
             Text(
                 stringResource(R.string.empty_state_title),
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 stringResource(R.string.empty_state_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                "Tap the + button to create your first alarm",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -466,18 +493,14 @@ fun BatteryOptimizationWarning() {
     }
     
     if (isVisible) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            ),
-            elevation = CardDefaults.cardElevation(2.dp)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.errorContainer,
+            tonalElevation = 2.dp
         ) {
             Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Title
                 Text(
@@ -505,7 +528,17 @@ fun BatteryOptimizationWarning() {
                             AutostartHelper.openAutostartSettings(context)
                         },
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.onErrorContainer,
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            )
+                        )
                     ) {
                         Text(
                             stringResource(R.string.battery_warning_btn_settings),
@@ -521,10 +554,9 @@ fun BatteryOptimizationWarning() {
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
                     ) {
                         Text(
                             stringResource(R.string.battery_warning_btn_enabled),
@@ -536,20 +568,18 @@ fun BatteryOptimizationWarning() {
                 // Secondary buttons row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     // Hide for Now Button
                     TextButton(
                         onClick = {
                             isVisible = false
-                        },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                        }
                     ) {
                         Text(
                             stringResource(R.string.battery_warning_btn_hide),
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                         )
                     }
                     
@@ -558,14 +588,12 @@ fun BatteryOptimizationWarning() {
                         onClick = {
                             settingsRepository.setBatteryWarningNeverShow(true)
                             isVisible = false
-                        },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                        }
                     ) {
                         Text(
                             stringResource(R.string.battery_warning_btn_never),
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                         )
                     }
                 }
@@ -785,65 +813,121 @@ fun AlarmItem(
         }
     }
 
+    var showMenu by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (alarm.isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-            contentColor = if (alarm.isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+            containerColor = if (alarm.isActive) 
+                MaterialTheme.colorScheme.primaryContainer 
+            else 
+                MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = if (alarm.isActive) 
+                MaterialTheme.colorScheme.onPrimaryContainer 
+            else 
+                MaterialTheme.colorScheme.onSurface
         ),
-        elevation = CardDefaults.cardElevation(2.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp,
+            pressedElevation = 4.dp
+        )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             // Header with actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 12.dp)
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    Text(
+                        text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 
-                // Action icons
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onMoveUp,
-                        enabled = index > 0
-                    ) {
-                        Icon(
-                            Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Move Up",
-                            tint = if (index > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                        )
-                    }
-                    IconButton(
-                        onClick = onMoveDown,
-                        enabled = index < totalAlarms - 1
-                    ) {
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Move Down",
-                            tint = if (index < totalAlarms - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                        )
-                    }
+                    // Clone button (outside menu for quick access)
                     IconButton(onClick = onClone) {
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = "Clone"
                         )
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error
-                        )
+                    
+                    // Overflow menu
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "More options"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Move Up") },
+                                onClick = {
+                                    onMoveUp()
+                                    showMenu = false
+                                },
+                                enabled = index > 0,
+                                leadingIcon = {
+                                    Icon(Icons.Default.KeyboardArrowUp, null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Move Down") },
+                                onClick = {
+                                    onMoveDown()
+                                    showMenu = false
+                                },
+                                enabled = index < totalAlarms - 1,
+                                leadingIcon = {
+                                    Icon(Icons.Default.KeyboardArrowDown, null)
+                                }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    onDelete()
+                                    showMenu = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Content
             EditAlarmContent(

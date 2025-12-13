@@ -1,5 +1,6 @@
 package com.medicinereminder.app
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,23 +38,24 @@ fun SettingsScreen(
         SettingsRepository.THEME_AUTO to "Auto"
     )
     
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { 
-                    Text(
-                        "Settings",
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Settings")
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -60,203 +63,94 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Theme Section
-            Card(
+            SettingsSectionHeader("Appearance")
+            
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(2.dp)
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        "Theme",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    ExposedDropdownMenuBox(
+                Column {
+                    SettingsDropdownItem(
+                        title = "Theme",
+                        subtitle = themeOptions[selectedTheme] ?: "Auto",
                         expanded = themeExpanded,
-                        onExpandedChange = { themeExpanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = themeOptions[selectedTheme] ?: "Auto",
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = themeExpanded,
-                            onDismissRequest = { themeExpanded = false }
-                        ) {
-                            themeOptions.forEach { (value, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        selectedTheme = value
-                                        repository.setThemeMode(value)
-                                        onThemeChanged()
-                                        themeExpanded = false
-                                    },
-                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
-                                )
-                            }
+                        onExpandedChange = { themeExpanded = it },
+                        options = themeOptions,
+                        onOptionSelected = { value ->
+                            selectedTheme = value
+                            repository.setThemeMode(value)
+                            onThemeChanged()
+                            themeExpanded = false
                         }
-                    }
-                    
-
+                    )
                 }
             }
             
+            Spacer(modifier = Modifier.height(24.dp))
+            
             // Behavior Section
-            Card(
+            SettingsSectionHeader("Behavior")
+            
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(2.dp)
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        "Behavior",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                Column {
+                    SettingsSwitchItem(
+                        title = "Minimize on Start",
+                        subtitle = "When you click start chain sequence it will minimize the app to home screen",
+                        checked = closeOnStart,
+                        onCheckedChange = { enabled ->
+                            closeOnStart = enabled
+                            repository.setCloseOnStart(enabled)
+                        }
                     )
                     
-                    // Minimize on Start Option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Minimize on Start",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                "When you click start chain sequence it will minimize the app to home screen",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                    
+                    SettingsSwitchItem(
+                        title = "Hide Stop Button",
+                        subtitle = "Hides the stop sequence button so you can't accidentally click it",
+                        checked = hideStopButton,
+                        onCheckedChange = { enabled ->
+                            hideStopButton = enabled
+                            repository.setHideStopButton(enabled)
                         }
-                        Switch(
-                            checked = closeOnStart,
-                            onCheckedChange = { enabled ->
-                                closeOnStart = enabled
-                                repository.setCloseOnStart(enabled)
-                            }
-                        )
-                    }
+                    )
                     
-                    Divider()
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
                     
-                    // Hide Stop Button Option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Hide Stop Button",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                "Hides the stop sequence button so you can't accidentally click it",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    SettingsSwitchItem(
+                        title = "Hide Counter Notification",
+                        subtitle = "Hides the countdown notification completely. Only the alarm notification will appear when each alarm rings",
+                        checked = dismissableCounter,
+                        onCheckedChange = { enabled ->
+                            dismissableCounter = enabled
+                            repository.setDismissableCounter(enabled)
                         }
-                        Switch(
-                            checked = hideStopButton,
-                            onCheckedChange = { enabled ->
-                                hideStopButton = enabled
-                                repository.setHideStopButton(enabled)
-                            }
-                        )
-                    }
+                    )
                     
-                    Divider()
-                    
-                    // Dismissable Counter Notification Option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Hide Counter Notification",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                "Hides the countdown notification completely. Only the alarm notification will appear when each alarm rings",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = dismissableCounter,
-                            onCheckedChange = { enabled ->
-                                dismissableCounter = enabled
-                                repository.setDismissableCounter(enabled)
-                            }
-                        )
-                    }
-                    
-                    Divider()
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
                     
                     // Default Alarm Time Option
                     var showTimeDialog by remember { mutableStateOf(false) }
                     var defaultTime by remember { mutableStateOf(repository.getDefaultAlarmTime()) }
                     
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                showTimeDialog = true
-                            }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                context.getString(R.string.settings_default_time),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                context.getString(R.string.settings_default_time_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            String.format("%02d:%02d:%02d", 
-                                defaultTime / 3600,
-                                (defaultTime % 3600) / 60,
-                                defaultTime % 60
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    SettingsClickableItem(
+                        title = context.getString(R.string.settings_default_time),
+                        subtitle = context.getString(R.string.settings_default_time_desc),
+                        value = String.format("%02d:%02d:%02d", 
+                            defaultTime / 3600,
+                            (defaultTime % 3600) / 60,
+                            defaultTime % 60
+                        ),
+                        onClick = { showTimeDialog = true }
+                    )
                     
                     // Time Picker Dialog
                     if (showTimeDialog) {
@@ -302,76 +196,33 @@ fun SettingsScreen(
                 }
             }
             
+            Spacer(modifier = Modifier.height(24.dp))
+            
             // System Section
-            Card(
+            SettingsSectionHeader("System")
+            
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(2.dp)
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        "System",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                Column {
+                    SettingsClickableItem(
+                        title = context.getString(R.string.settings_autostart),
+                        subtitle = context.getString(R.string.settings_autostart_desc),
+                        onClick = { AutostartHelper.openAutostartSettings(context) }
                     )
                     
-                    // Autostart Settings Option
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                AutostartHelper.openAutostartSettings(context)
-                            }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                context.getString(R.string.settings_autostart),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                context.getString(R.string.settings_autostart_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    
-                    Divider()
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
                     
                     // Clear App Data Option
                     var showClearDialog by remember { mutableStateOf(false) }
                     
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                showClearDialog = true
-                            }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                context.getString(R.string.settings_clear_data),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                context.getString(R.string.settings_clear_data_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
+                    SettingsClickableItem(
+                        title = context.getString(R.string.settings_clear_data),
+                        subtitle = context.getString(R.string.settings_clear_data_desc),
+                        onClick = { showClearDialog = true },
+                        isDestructive = true
+                    )
                     
                     // Clear Data Confirmation Dialog
                     if (showClearDialog) {
@@ -407,6 +258,158 @@ fun SettingsScreen(
                                     Text(context.getString(R.string.settings_clear_data_confirm_no))
                                 }
                             }
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun SettingsSwitchItem(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@Composable
+private fun SettingsClickableItem(
+    title: String,
+    subtitle: String,
+    value: String? = null,
+    onClick: () -> Unit,
+    isDestructive: Boolean = false
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isDestructive) 
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.7f) 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (value != null) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsDropdownItem(
+    title: String,
+    subtitle: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    options: Map<String, String>,
+    onOptionSelected: (String) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column {
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = onExpandedChange
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                        .clickable { onExpandedChange(!expanded) }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { onExpandedChange(false) }
+                ) {
+                    options.forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = { onOptionSelected(value) },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                         )
                     }
                 }
