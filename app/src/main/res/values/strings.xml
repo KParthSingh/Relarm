@@ -38,7 +38,7 @@
     <string name="battery_warning_title">IMPORTANT: Enable Autostart</string>
     <string name="battery_warning_message">"If you're seeing this message it means you're (probably) using android device with aggressive battery management. In order for this app to run alarms in the background you should enable autostart. I'm not trying to hack into your phone okay? pinky promise."</string>
     <string name="battery_warning_btn_settings">Open Settings</string>
-    <string name="battery_warning_btn_enabled">Autostart Enabled</string>
+    <string name="battery_warning_btn_enabled">"I've Enabled Autostart"</string>
     <string name="battery_warning_btn_hide">Hide for now</string>
     <string name="battery_warning_btn_never">Don\'t Show Again</string>
     
