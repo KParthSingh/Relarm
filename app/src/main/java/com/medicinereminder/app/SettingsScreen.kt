@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -71,8 +72,10 @@ fun SettingsScreen(
             SettingsSectionHeader("Appearance")
             
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 1.dp
             ) {
                 Column {
                     SettingsDropdownItem(
@@ -97,8 +100,10 @@ fun SettingsScreen(
             SettingsSectionHeader("Behavior")
             
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 1.dp
             ) {
                 Column {
                     SettingsSwitchItem(
@@ -202,8 +207,10 @@ fun SettingsScreen(
             SettingsSectionHeader("System")
             
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 1.dp
             ) {
                 Column {
                     SettingsClickableItem(
@@ -272,10 +279,10 @@ fun SettingsScreen(
 private fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.labelLarge,
+        style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
     )
 }
 

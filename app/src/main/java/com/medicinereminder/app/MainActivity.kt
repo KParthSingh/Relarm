@@ -638,10 +638,13 @@ fun StickyChainBar(
     }
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 8.dp,
         shadowElevation = 8.dp,
-        modifier = Modifier.fillMaxWidth()
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // DISMISS button when alarm is ringing (prominent placement)
@@ -652,8 +655,8 @@ fun StickyChainBar(
                         .fillMaxWidth()
                         .height(64.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -678,7 +681,7 @@ fun StickyChainBar(
                         else stringResource(R.string.chain_active_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (isAlarmRinging) MaterialTheme.colorScheme.primary
+                        color = if (isAlarmRinging) MaterialTheme.colorScheme.error
                                else if (isPaused) MaterialTheme.colorScheme.error 
                                else MaterialTheme.colorScheme.primary
                     )
@@ -690,11 +693,11 @@ fun StickyChainBar(
                 
                 if (!isAlarmRinging) {
                     Row {
-                        Button(
+                        FilledTonalButton(
                             onClick = { if (isPaused) onResume() else onPause() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isPaused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = if (isPaused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (isPaused) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = if (isPaused) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
@@ -703,11 +706,11 @@ fun StickyChainBar(
                         
                         Spacer(modifier = Modifier.width(8.dp))
                         
-                        Button(
+                        FilledTonalButton(
                             onClick = onStop,
-                            colors = ButtonDefaults.buttonColors(
+                            colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.error
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
@@ -733,14 +736,10 @@ fun StickyChainBar(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
+                OutlinedButton(
                     onClick = onPrev,
                     enabled = currentIndex > 0,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         Icons.Default.KeyboardArrowUp,
@@ -751,14 +750,10 @@ fun StickyChainBar(
                     Text("PREV")
                 }
                 
-                Button(
+                OutlinedButton(
                     onClick = onNext,
                     enabled = currentIndex < totalAlarms - 1,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text("NEXT")
                     Spacer(modifier = Modifier.width(4.dp))

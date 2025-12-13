@@ -38,7 +38,10 @@ private val LightColors = lightColorScheme(
     onSurface = md_theme_light_onSurface,
     surfaceVariant = md_theme_light_surfaceVariant,
     onSurfaceVariant = md_theme_light_onSurfaceVariant,
-    outline = md_theme_light_outline
+    outline = md_theme_light_outline,
+    surfaceContainer = md_theme_light_surfaceContainer,
+    surfaceContainerHigh = md_theme_light_surfaceContainerHigh,
+    surfaceContainerLowest = md_theme_light_surfaceContainerLowest,
 )
 
 
@@ -65,7 +68,10 @@ private val DarkColors = darkColorScheme(
     onSurface = md_theme_dark_onSurface,
     surfaceVariant = md_theme_dark_surfaceVariant,
     onSurfaceVariant = md_theme_dark_onSurfaceVariant,
-    outline = md_theme_dark_outline
+    outline = md_theme_dark_outline,
+    surfaceContainer = md_theme_dark_surfaceContainer,
+    surfaceContainerHigh = md_theme_dark_surfaceContainerHigh,
+    surfaceContainerLowest = md_theme_dark_surfaceContainerLowest,
 )
 
 @Composable
@@ -95,8 +101,8 @@ fun MedicineReminderTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme // Inverse for status bar text
+            window.statusBarColor = colorScheme.background.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
