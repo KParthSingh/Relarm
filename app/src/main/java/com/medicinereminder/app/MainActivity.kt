@@ -472,13 +472,6 @@ fun EmptyState() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Tap the + button to create your first alarm",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
@@ -825,8 +818,6 @@ fun AlarmItem(
             onUpdate(alarm.copy(isActive = false, scheduledTime = 0L))
         }
     }
-
-    var showMenu by remember { mutableStateOf(false) }
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -878,7 +869,31 @@ fun AlarmItem(
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Clone button (outside menu for quick access)
+                    // Move Up button
+                    IconButton(
+                        onClick = onMoveUp,
+                        enabled = index > 0
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Move Up",
+                            tint = if (index > 0) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.38f)
+                        )
+                    }
+                    
+                    // Move Down button
+                    IconButton(
+                        onClick = onMoveDown,
+                        enabled = index < totalAlarms - 1
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Move Down",
+                            tint = if (index < totalAlarms - 1) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.38f)
+                        )
+                    }
+                    
+                    // Clone button
                     IconButton(onClick = onClone) {
                         Icon(
                             Icons.Default.ContentCopy,
@@ -886,56 +901,13 @@ fun AlarmItem(
                         )
                     }
                     
-                    // Overflow menu
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = "More options"
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Move Up") },
-                                onClick = {
-                                    onMoveUp()
-                                    showMenu = false
-                                },
-                                enabled = index > 0,
-                                leadingIcon = {
-                                    Icon(Icons.Default.KeyboardArrowUp, null)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Move Down") },
-                                onClick = {
-                                    onMoveDown()
-                                    showMenu = false
-                                },
-                                enabled = index < totalAlarms - 1,
-                                leadingIcon = {
-                                    Icon(Icons.Default.KeyboardArrowDown, null)
-                                }
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                                onClick = {
-                                    onDelete()
-                                    showMenu = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            )
-                        }
+                    // Delete button
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
