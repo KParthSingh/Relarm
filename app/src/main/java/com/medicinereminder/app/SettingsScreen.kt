@@ -271,6 +271,32 @@ fun SettingsScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Developer Options
+            SettingsSectionHeader("Developer Options")
+            
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    var forceBatteryWarning by remember { mutableStateOf(repository.getForceBatteryWarning()) }
+                    
+                    SettingsSwitchItem(
+                        title = "Force Battery Warning",
+                        subtitle = "Show battery optimization warning on any device (for testing)",
+                        checked = forceBatteryWarning,
+                        onCheckedChange = { enabled ->
+                            forceBatteryWarning = enabled
+                            repository.setForceBatteryWarning(enabled)
+                        }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

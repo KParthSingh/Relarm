@@ -486,8 +486,9 @@ fun BatteryOptimizationWarning() {
     
     // Check if warning should be shown
     LaunchedEffect(Unit) {
-        val showWarning = ManufacturerDetector.requiresAutostartWarning() && 
-                         !settingsRepository.getBatteryWarningNeverShow()
+        val forceShow = settingsRepository.getForceBatteryWarning()
+        val showWarning = forceShow || (ManufacturerDetector.requiresAutostartWarning() && 
+                         !settingsRepository.getBatteryWarningNeverShow())
         isVisible = showWarning
     }
     
@@ -720,14 +721,7 @@ fun StickyChainBar(
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
-            val progress = (currentIndex + 1).toFloat() / totalAlarms.toFloat()
-            LinearProgressIndicator(
-                progress = progress,
-                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+
             
             val remainingSeconds = (remainingTimeMs / 1000).toInt().coerceAtLeast(0)
             
@@ -771,7 +765,7 @@ fun StickyChainBar(
                 Text(
                     if (isPaused) "Resumes in: ${formatTime(remainingSeconds)}" 
                     else "Next alarm: ${formatTime(remainingSeconds)}",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 )
 
@@ -788,7 +782,7 @@ fun StickyChainBar(
                 
                 Text(
                     "Last alarm: $formattedTime",
-                    style = MaterialTheme.typography.labelSmall
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
         }
