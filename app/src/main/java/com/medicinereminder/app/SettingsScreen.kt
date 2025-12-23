@@ -293,6 +293,68 @@ fun SettingsScreen(
                             repository.setForceBatteryWarning(enabled)
                         }
                     )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                    
+                    // Export Debug Logs
+                    SettingsClickableItem(
+                        title = "Export Debug Logs",
+                        subtitle = "Share debug log file for troubleshooting",
+                        onClick = {
+                            val exportFile = DebugLogger.exportLogs(context)
+                            if (exportFile != null) {
+                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    exportFile
+                                )
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Export Debug Logs"))
+                            }
+                        }
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                    
+                    // Clear Debug Logs
+                    var showClearLogsDialog by remember { mutableStateOf(false) }
+                    
+                    SettingsClickableItem(
+                        title = "Clear Debug Logs",
+                        subtitle = "Delete all debug log files",
+                        onClick = { showClearLogsDialog = true },
+                        isDestructive = true
+                    )
+                    
+                    if (showClearLogsDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showClearLogsDialog = false },
+                            title = { Text("Clear All Logs?") },
+                            text = { Text("This will permanently delete all debug log files. This action cannot be undone.") },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        DebugLogger.clearLogs()
+                                        showClearLogsDialog = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text("Clear")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showClearLogsDialog = false }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
                 }
             }
             

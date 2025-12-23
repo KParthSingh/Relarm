@@ -9,8 +9,16 @@ import android.util.Log
 class AlarmStopReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == "com.medicinereminder.app.STOP_ALARM") {
+            DebugLogger.warn("AlarmStopReceiver", "========== DISMISS ALARM CLICKED ==========")
+            val chainManager = ChainManager(context)
+            DebugLogger.logState("AlarmStopReceiver", mapOf(
+                "chainActive" to chainManager.isChainActive(),
+                "currentIndex" to chainManager.getCurrentIndex(),
+                "wasAlarmRinging" to chainManager.isAlarmRinging()
+            ))
+            
             // Clear alarm ringing state
-            ChainManager(context).setAlarmRinging(false)
+            chainManager.setAlarmRinging(false)
             
             // Stop the alarm service
             val serviceIntent = Intent(context, AlarmService::class.java)
@@ -22,7 +30,6 @@ class AlarmStopReceiver : BroadcastReceiver() {
             notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
             
             // Check if we're in a chain and need to start the next alarm
-            val chainManager = ChainManager(context)
             if (chainManager.isChainActive()) {
                 val alarmRepository = AlarmRepository(context)
                 val alarms = alarmRepository.loadAlarms()
@@ -30,6 +37,7 @@ class AlarmStopReceiver : BroadcastReceiver() {
                 // Move to next alarm
                 chainManager.moveToNextAlarm()
                 val nextIndex = chainManager.getCurrentIndex()
+                DebugLogger.info("AlarmStopReceiver", "Moving to next alarm in chain: index=$nextIndex, total=${alarms.size}")
                 
                 if (nextIndex < alarms.size) {
                     // Start the next alarm in the chain
@@ -63,6 +71,7 @@ class AlarmStopReceiver : BroadcastReceiver() {
                     alarmRepository.saveAlarms(updatedAlarms)
                 } else {
                     // Chain complete - stop everything
+                    DebugLogger.info("AlarmStopReceiver", "Chain complete - all alarms finished")
                     chainManager.stopChain()
                     
                     // Stop ChainService to remove notification

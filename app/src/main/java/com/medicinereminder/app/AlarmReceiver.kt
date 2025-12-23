@@ -11,6 +11,7 @@ import android.util.Log
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("AlarmReceiver", "Alarm triggered!")
+        DebugLogger.warn("AlarmReceiver", "========== ALARM TRIGGERED ==========")
         
         // Acquire wake lock to ensure device wakes up
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -26,6 +27,12 @@ class AlarmReceiver : BroadcastReceiver() {
             // Check if we're in a chain - if so, notify ChainService to trigger the alarm
             val chainManager = ChainManager(context)
             if (chainManager.isChainActive()) {
+                DebugLogger.logState("AlarmReceiver", mapOf(
+                    "chainActive" to true,
+                    "currentIndex" to chainManager.getCurrentIndex(),
+                    "isPaused" to chainManager.isChainPaused(),
+                    "isAlarmRinging" to chainManager.isAlarmRinging()
+                ))
                 Log.d("AlarmReceiver", "Chain is active - Notifying ChainService to trigger alarm")
                 
                 // Send intent to ChainService to trigger the alarm
@@ -43,6 +50,7 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             // Not in a chain - this is a standalone alarm, proceed normally
+            DebugLogger.info("AlarmReceiver", "Chain NOT active - starting standalone alarm")
             Log.d("AlarmReceiver", "Standalone alarm detected, proceeding with alarm service")
             
             // Start foreground service (it will show the notification with STOP button)

@@ -48,6 +48,21 @@ import com.medicinereminder.app.ui.theme.MedicineReminderTheme
 import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Date
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.draw.alpha
+import kotlinx.coroutines.isActive
 
 class MainActivity : ComponentActivity() {
     private lateinit var alarmScheduler: AlarmScheduler
@@ -61,6 +76,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize debug logger
+        DebugLogger.init(this)
+        DebugLogger.info("MainActivity", "========== APP STARTED ==========")
         
         alarmScheduler = AlarmScheduler(this)
         
@@ -102,6 +121,7 @@ class MainActivity : ComponentActivity() {
     
     override fun onStop() {
         super.onStop()
+        DebugLogger.info("MainActivity", "onStop() - App going to background")
         // App going to background - pause countdown loop if hide counter is ON
         val settingsRepository = SettingsRepository(this)
         val hideCounter = settingsRepository.getDismissableCounter()
@@ -118,6 +138,7 @@ class MainActivity : ComponentActivity() {
     
     override fun onStart() {
         super.onStart()
+        DebugLogger.info("MainActivity", "onStart() - App coming to foreground")
         // App coming to foreground - resume countdown loop if hide counter is ON
         val settingsRepository = SettingsRepository(this)
         val hideCounter = settingsRepository.getDismissableCounter()
@@ -179,7 +200,7 @@ class MainActivity : ComponentActivity() {
 // --- THEME moved to ui.theme package ---
 
 // --- MAIN SCREEN ---
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MainScreen(
     onScheduleAlarm: (Long, Int, String, Int, Int) -> Unit,
@@ -196,6 +217,7 @@ fun MainScreen(
     var isAlarmRinging by remember { mutableStateOf(false) }
 
     // Sync State Loop
+    var logCounter by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
             alarms = repository.loadAlarms()
@@ -205,6 +227,18 @@ fun MainScreen(
             
             // Check if alarm is ringing from ChainManager state
             isAlarmRinging = chainManager.isAlarmRinging()
+            
+            // Log state snapshot every 10 seconds to avoid spam
+            logCounter++
+            if (logCounter % 10 == 0) {
+                DebugLogger.logState("MainScreen-UI", mapOf(
+                    "isChainActive" to isChainActive,
+                    "isPaused" to isPaused,
+                    "currentChainIndex" to currentChainIndex,
+                    "isAlarmRinging" to isAlarmRinging,
+                    "totalAlarms" to alarms.size
+                ))
+            }
             
             delay(1000) // Poll every second for updates from Service/Receiver
         }
@@ -372,72 +406,237 @@ fun MainScreen(
             }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
+        // Drag and Scroll State
+        val listState = rememberLazyListState()
+        var draggedAlarmId by remember { mutableStateOf<String?>(null) }
+        var draggingItemInitialY by remember { mutableFloatStateOf(0f) }
+        var totalDragOffsetY by remember { mutableFloatStateOf(0f) }
+        var autoScrollSpeed by remember { mutableFloatStateOf(0f) }
+        var lastSwapTime by remember { mutableLongStateOf(0L) }
+        
+        // Map to store original indices when drag starts
+        // We moved this up to be accessible for Overlay
+        val dragStartIndices = remember { mutableStateMapOf<String, Int>() }
 
-            // Battery Optimization Warning
-            BatteryOptimizationWarning()
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // ALARMS LIST
-            if (alarms.isEmpty()) {
-                EmptyState()
-            } else {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    alarms.forEachIndexed { index, alarm ->
-                        AlarmItem(
-                            alarm = alarm,
-                            index = index,
-                            totalAlarms = alarms.size,
-                            onUpdate = { updated ->
-                                alarms = alarms.toMutableList().apply { set(index, updated) }
-                            },
-                            onSchedule = { delay ->
-                                onScheduleAlarm(delay, index + 1, alarm.name, index, 1) // optimized for single alarm: treat as 1 of 1
-                                alarms = alarms.toMutableList().apply {
-                                    set(index, alarm.copy(
-                                        isActive = true,
-                                        scheduledTime = System.currentTimeMillis() + delay
-                                    ))
-                                }
-                            },
-                            onDelete = {
-                                alarms = alarms.toMutableList().apply { removeAt(index) }
-                            },
-                            onMoveUp = {
-                                if (index > 0) {
-                                    alarms = alarms.toMutableList().apply {
-                                        val temp = this[index]; this[index] = this[index - 1]; this[index - 1] = temp
-                                    }
-                                }
-                            },
-                            onMoveDown = {
-                                if (index < alarms.size - 1) {
-                                    alarms = alarms.toMutableList().apply {
-                                        val temp = this[index]; this[index] = this[index + 1]; this[index + 1] = temp
-                                    }
-                                }
-                            },
-                            onClone = {
-                                alarms = alarms.toMutableList().apply { add(index + 1, alarm.clone()) }
-                            }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
+        val itemHeights = remember { mutableStateMapOf<String, Int>() }
+        val itemCoordinates = remember { mutableStateMapOf<String, androidx.compose.ui.layout.LayoutCoordinates>() }
+        var listCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+        
+        val density = LocalDensity.current
+        val spacing = 24.dp
+        
+        // Auto-scroll loop
+        LaunchedEffect(autoScrollSpeed) {
+            if (autoScrollSpeed != 0f) {
+                while (isActive) {
+                    val scrollAmount = autoScrollSpeed
+                    listState.scrollBy(scrollAmount)
+                    delay(16)
                 }
             }
+        }
 
-            // START CHAIN BUTTON (Sticky bottom if not empty)
-
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                contentPadding = paddingValues,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .onGloballyPositioned { listCoordinates = it }
+                    .pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                val listCoords = listCoordinates ?: return@detectDragGesturesAfterLongPress
+                                // Convert tap to root to find the hit item
+                                val rootOffset = listCoords.localToRoot(offset)
+                                
+                                val hitId = itemCoordinates.entries.firstOrNull { (id, coords) ->
+                                    if (!coords.isAttached) return@firstOrNull false
+                                    val pos = coords.positionInRoot()
+                                    rootOffset.y >= pos.y && rootOffset.y <= pos.y + coords.size.height
+                                }?.key
+                                
+                                if (hitId != null) {
+                                    draggedAlarmId = hitId
+                                    // Capture current indices for stable numbering
+                                    alarms.forEachIndexed { i, a -> dragStartIndices[a.id] = i }
+                                    
+                                    val itemCoords = itemCoordinates[hitId]!!
+                                    draggingItemInitialY = itemCoords.positionInRoot().y - listCoords.positionInRoot().y 
+                                    totalDragOffsetY = 0f
+                                }
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                if (draggedAlarmId != null) {
+                                    totalDragOffsetY += dragAmount.y
+                                    
+                                    // Calculate Swap Logic
+                                    val overlayTop = draggingItemInitialY + totalDragOffsetY
+                                    val listCoords = listCoordinates
+                                    
+                                    if (listCoords != null) {
+                                        // Current Slot Global Y calculation
+                                        val currentSlotCoords = itemCoordinates[draggedAlarmId!!]
+                                        if (currentSlotCoords != null && currentSlotCoords.isAttached) {
+                                            val currentSlotGlobalY = currentSlotCoords.positionInRoot().y
+                                            // Overlay Global Y
+                                            val overlayGlobalY = listCoords.positionInRoot().y + overlayTop
+                                            
+                                            val diff = overlayGlobalY - currentSlotGlobalY
+                                            val spacingPx = with(density) { spacing.toPx() }
+                                            val currentTime = System.currentTimeMillis()
+                                            
+                                            // Debounce check: prevent swaps if less than 150ms passed since last swap
+                                            // This prevents "zipping" where stale layout coordinates trigger multiple swaps
+                                            if (currentTime - lastSwapTime > 150) { 
+                                                val currentIndex = alarms.indexOfFirst { it.id == draggedAlarmId }
+                                                if (currentIndex != -1) {
+                                                    // Move Down
+                                                    if (diff > 0 && currentIndex < alarms.size - 1) {
+                                                        val nextAlarmId = alarms[currentIndex + 1].id
+                                                        val nextHeight = itemHeights[nextAlarmId]?.toFloat() ?: 0f
+                                                        val fullHeight = nextHeight + spacingPx
+                                                        val threshold = fullHeight * 0.5f
+                                                        
+                                                        if (nextHeight > 0 && diff > threshold) {
+                                                            alarms = alarms.toMutableList().apply {
+                                                                val temp = this[currentIndex]; this[currentIndex] = this[currentIndex + 1]; this[currentIndex + 1] = temp
+                                                            }
+                                                            lastSwapTime = currentTime
+                                                        }
+                                                    }
+                                                    // Move Up
+                                                    else if (diff < 0 && currentIndex > 0) {
+                                                        val prevAlarmId = alarms[currentIndex - 1].id
+                                                        val prevHeight = itemHeights[prevAlarmId]?.toFloat() ?: 0f
+                                                        val fullHeight = prevHeight + spacingPx
+                                                        val threshold = fullHeight * 0.5f
+    
+                                                        if (prevHeight > 0 && diff < -threshold) {
+                                                             alarms = alarms.toMutableList().apply {
+                                                                val temp = this[currentIndex]; this[currentIndex] = this[currentIndex - 1]; this[currentIndex - 1] = temp
+                                                            }
+                                                            lastSwapTime = currentTime
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Auto Scroll Logic
+                                        val overlayGlobalY = listCoords.positionInRoot().y + overlayTop
+                                        val rootHeight = with(density) { context.resources.displayMetrics.heightPixels.toFloat() }
+                                        val threshold = rootHeight * 0.25f
+                                        
+                                        if (overlayGlobalY < threshold) {
+                                             autoScrollSpeed = -15f
+                                        } else if (overlayGlobalY > rootHeight - threshold) {
+                                             autoScrollSpeed = 15f
+                                        } else {
+                                             autoScrollSpeed = 0f
+                                        }
+                                    }
+                                }
+                            },
+                                    onDragEnd = {
+                                        draggedAlarmId = null
+                                        totalDragOffsetY = 0f
+                                        autoScrollSpeed = 0f
+                                        // dragStartIndices.clear() // Keep for a moment or clear? 
+                                        // Better to clear on start or just let it stay. 
+                                        // If we don't clear, next drag overwrites.
+                                        dragStartIndices.clear()
+                                    },
+                                    onDragCancel = {
+                                        draggedAlarmId = null
+                                        totalDragOffsetY = 0f
+                                        autoScrollSpeed = 0f
+                                        dragStartIndices.clear()
+                                    }
+                        )
+                }
+            ) {
+                item {
+                    BatteryOptimizationWarning()
+                }
+                
+                if (alarms.isEmpty()) {
+                    item { EmptyState() }
+                } else {
+                    itemsIndexed(alarms, key = { _, alarm -> alarm.id }) { index, alarm ->
+                        val isDragging = alarm.id == draggedAlarmId
+                        
+                        Box(
+                            modifier = Modifier
+                                .alpha(if (isDragging) 0f else 1f)
+                                .animateItemPlacement()
+                                .onGloballyPositioned { coordinates ->
+                                    itemHeights[alarm.id] = coordinates.size.height
+                                    itemCoordinates[alarm.id] = coordinates
+                                }
+                        ) {
+                            AlarmItem(
+                                alarm = alarm,
+                                index = (if (draggedAlarmId != null) dragStartIndices[alarm.id] else null) ?: index,
+                                totalAlarms = alarms.size,
+                                onUpdate = { updated ->
+                                    alarms = alarms.toMutableList().apply { set(index, updated) }
+                                },
+                                onSchedule = { delay ->
+                                    onScheduleAlarm(delay, index + 1, alarm.name, index, 1) 
+                                    alarms = alarms.toMutableList().apply {
+                                        set(index, alarm.copy(
+                                            isActive = true,
+                                            scheduledTime = System.currentTimeMillis() + delay
+                                        ))
+                                    }
+                                },
+                                onDelete = {
+                                    alarms = alarms.toMutableList().apply { removeAt(index) }
+                                },
+                                onClone = {
+                                    alarms = alarms.toMutableList().apply { add(index + 1, alarm.clone()) }
+                                }
+                            )
+                        }
+                    }
+                    item { 
+                        Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
+                    }
+                }
+            }
+            
+            // OVERLAY for dragged item
+            if (draggedAlarmId != null) {
+                val alarm = alarms.find { it.id == draggedAlarmId }
+                if (alarm != null) {
+                    val currentIndex = alarms.indexOf(alarm)
+                    val displayIndex = dragStartIndices[alarm.id] ?: currentIndex
+                    AlarmItem(
+                        alarm = alarm,
+                        index = displayIndex,
+                        totalAlarms = alarms.size,
+                        onUpdate = {},
+                        onSchedule = {},
+                        onDelete = {},
+                        onClone = {},
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // So LazyColumn Render Node starts at Top Left of content area.
+                            // So offset is correct.
+                            .offset { IntOffset(0, (draggingItemInitialY + totalDragOffsetY).toInt()) }
+                            .zIndex(10f)
+                            .graphicsLayer {
+                                scaleX = 1.05f
+                                scaleY = 1.05f
+                                shadowElevation = 8.dp.toPx()
+                            }
+                    )
+                }
+            }
         }
     }
 }
@@ -622,6 +821,16 @@ fun StickyChainBar(
     // Read remaining time from ChainManager (single source of truth updated by ChainService)
     var remainingTimeMs by remember { mutableLongStateOf(0L) }
     
+    // Log when isAlarmRinging changes
+    LaunchedEffect(isAlarmRinging) {
+        DebugLogger.logState("StickyChainBar-UI", mapOf(
+            "isAlarmRinging" to isAlarmRinging,
+            "currentIndex" to currentIndex,
+            "isPaused" to isPaused,
+            "showingDismissButton" to isAlarmRinging
+        ))
+    }
+    
     LaunchedEffect(Unit) {
         while (true) {
             if (chainManager.isChainPaused()) {
@@ -798,8 +1007,7 @@ fun AlarmItem(
     onUpdate: (Alarm) -> Unit,
     onSchedule: (Long) -> Unit,
     onDelete: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    modifier: Modifier = Modifier,
     onClone: () -> Unit
 ) {
 
@@ -814,7 +1022,7 @@ fun AlarmItem(
     }
     
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (alarm.isActive) 
                 MaterialTheme.colorScheme.primaryContainer 
@@ -863,30 +1071,6 @@ fun AlarmItem(
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Move Up button
-                    IconButton(
-                        onClick = onMoveUp,
-                        enabled = index > 0
-                    ) {
-                        Icon(
-                            Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Move Up",
-                            tint = if (index > 0) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.38f)
-                        )
-                    }
-                    
-                    // Move Down button
-                    IconButton(
-                        onClick = onMoveDown,
-                        enabled = index < totalAlarms - 1
-                    ) {
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Move Down",
-                            tint = if (index < totalAlarms - 1) LocalContentColor.current else LocalContentColor.current.copy(alpha = 0.38f)
-                        )
-                    }
-                    
                     // Clone button
                     IconButton(onClick = onClone) {
                         Icon(

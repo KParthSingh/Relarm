@@ -52,10 +52,30 @@ class AlarmScheduler(private val context: Context) {
                     pendingIntent
                 )
             }
-            Log.d("AlarmScheduler", "✓ Alarm scheduled successfully")
+            Log.d("AlarmScheduler", "✓ Alarm scheduled successfully (EXACT)")
             Log.d("AlarmScheduler", "=========================================")
         } catch (e: SecurityException) {
             Log.e("AlarmScheduler", "✗ Permission denied for exact alarms", e)
+            // CRITICAL FIX #7: Fallback to inexact alarm instead of failing silently
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                    Log.d("AlarmScheduler", "✓ Fallback: Alarm scheduled (INEXACT) - may be delayed")
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                    Log.d("AlarmScheduler", "✓ Fallback: Alarm scheduled (INEXACT) - may be delayed")
+                }
+            } catch (fallbackException: Exception) {
+                Log.e("AlarmScheduler", "✗ Complete failure - alarm not scheduled!", fallbackException)
+            }
             Log.d("AlarmScheduler", "=========================================")
         }
     }
