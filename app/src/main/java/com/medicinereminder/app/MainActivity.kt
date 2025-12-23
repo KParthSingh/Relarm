@@ -14,20 +14,25 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -267,8 +272,8 @@ fun MainScreen(
                 },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -285,7 +290,7 @@ fun MainScreen(
                     },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    icon = { Icon(Icons.Default.Add, "Add Alarm") },
+                    icon = { Icon(Icons.Outlined.Add, "Add Alarm") },
                     text = { Text(stringResource(R.string.btn_new_alarm)) }
                 )
             }
@@ -423,7 +428,7 @@ fun MainScreen(
         var listCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
         
         val density = LocalDensity.current
-        val spacing = 24.dp
+        val spacing = 8.dp
         
         // Auto-scroll loop
         LaunchedEffect(autoScrollSpeed) {
@@ -571,6 +576,7 @@ fun MainScreen(
                         
                         Box(
                             modifier = Modifier
+                                .padding(horizontal = 10.dp)
                                 .alpha(if (isDragging) 0f else 1f)
                                 .animateItemPlacement()
                                 .onGloballyPositioned { coordinates ->
@@ -625,6 +631,7 @@ fun MainScreen(
                         onClone = {},
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = 10.dp)
                             // So LazyColumn Render Node starts at Top Left of content area.
                             // So offset is correct.
                             .offset { IntOffset(0, (draggingItemInitialY + totalDragOffsetY).toInt()) }
@@ -1010,63 +1017,100 @@ fun AlarmItem(
     modifier: Modifier = Modifier,
     onClone: () -> Unit
 ) {
-
+    val context = LocalContext.current
+    var showNameDialog by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var showSoundPicker by remember { mutableStateOf(false) }
     
-    // Auto-reset
+    // Calculate current progress for visual display
+    var displayProgress by remember { mutableFloatStateOf(alarm.getProgress()) }
+    var remainingTime by remember { mutableIntStateOf(alarm.getTotalSeconds()) }
+    
+    // Update progress and remaining time in real-time
+    LaunchedEffect(alarm.state, alarm.isActive) {
+        while (alarm.state == AlarmState.RUNNING && alarm.isActive) {
+            displayProgress = alarm.getProgress()
+            val elapsed = System.currentTimeMillis() - alarm.startTime
+            val remaining = ((alarm.totalDuration - elapsed) / 1000).toInt().coerceAtLeast(0)
+            remainingTime = remaining
+            delay(100) // Update 10 times per second for smooth animation
+        }
+    }
+    
+    // Auto-reset when timer expires
     LaunchedEffect(alarm.isActive, alarm.scheduledTime) {
         if (alarm.isActive && alarm.scheduledTime > 0) {
             val remaining = alarm.scheduledTime - System.currentTimeMillis()
             if (remaining > 0) delay(remaining)
-            onUpdate(alarm.copy(isActive = false, scheduledTime = 0L))
+            onUpdate(alarm.copy(isActive = false, scheduledTime = 0L, state = AlarmState.RESET))
         }
     }
     
+    // Sound picker launcher
+    val soundPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            onUpdate(alarm.copy(soundUri = uri?.toString()))
+        }
+    }
+    
+    val isExpanded = alarm.state != AlarmState.RESET
+    
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(), // Smooth height animation
         colors = CardDefaults.cardColors(
-            containerColor = if (alarm.isActive) 
-                MaterialTheme.colorScheme.primaryContainer 
-            else 
-                MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = if (alarm.isActive) 
-                MaterialTheme.colorScheme.onPrimaryContainer 
-            else 
-                MaterialTheme.colorScheme.onSurface
+            containerColor = when (alarm.state) {
+                AlarmState.RUNNING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                AlarmState.PAUSED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                AlarmState.EXPIRED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                else -> MaterialTheme.colorScheme.surface
+            },
+            contentColor = MaterialTheme.colorScheme.onSurface
         ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp,
-            pressedElevation = 4.dp
+            defaultElevation = 1.dp,
+            pressedElevation = 3.dp
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header with actions
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            // ===== HEADER SECTION =====
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // Label with clickable edit
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showNameDialog = true }
+                        .padding(6.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 12.dp)
-                    ) {
-                        Text(
-                            text = "${index + 1}",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = "Edit label",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (alarm.name.isNotBlank()) alarm.name else "Alarm ${index + 1}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (alarm.name.isNotBlank()) 
+                            MaterialTheme.colorScheme.onSurface 
+                        else 
+                            MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 
@@ -1074,33 +1118,447 @@ fun AlarmItem(
                     // Clone button
                     IconButton(onClick = onClone) {
                         Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = "Clone"
+                            Icons.Outlined.ContentCopy,
+                            contentDescription = "Clone",
+                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     
                     // Delete button
                     IconButton(onClick = onDelete) {
                         Icon(
-                            Icons.Default.Delete,
+                            Icons.Outlined.Delete,
                             contentDescription = "Delete",
+                            modifier = Modifier.size(22.dp),
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (!isExpanded) {
+                // ===== COMPACT LAYOUT (RESET STATE) =====
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Duration text with edit icon on left
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showTimePicker = true }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = "Edit duration",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = alarm.getFormattedTime(),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    
+                    // Start button on right
+                    Button(
+                        onClick = {
+                            val delay = alarm.getTotalSeconds() * 1000L
+                            val now = System.currentTimeMillis()
+                            onSchedule(delay)
+                            onUpdate(alarm.copy(
+                                isActive = true,
+                                scheduledTime = now + delay,
+                                state = AlarmState.RUNNING,
+                                totalDuration = delay,
+                                startTime = now
+                            ))
+                        },
+                        enabled = alarm.getTotalSeconds() > 0,
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.PlayArrow,
+                            contentDescription = "Start",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("START", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            } else {
+                // ===== EXPANDED LAYOUT (ACTIVE STATE) =====
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Central circle section
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    com.medicinereminder.app.ui.CircleButtonsLayout(
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f) // Make circle 50% of card width
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            // Progress circle
+                            com.medicinereminder.app.ui.TimerCircleView(
+                                progress = displayProgress,
+                                isExpired = alarm.state == AlarmState.EXPIRED,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            
+                            // Time display in center
+                            Text(
+                                text = if (alarm.state == AlarmState.RUNNING || alarm.state == AlarmState.PAUSED) {
+                                    formatTime(remainingTime)
+                                } else {
+                                    alarm.getFormattedTime()
+                                },
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (alarm.state == AlarmState.PAUSED) 
+                                    MaterialTheme.colorScheme.error 
+                                else 
+                                    MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.clickable { showTimePicker = true }
+                            )
+                            
+                            // Reset button (only visible when paused or running)
+                            if (alarm.state == AlarmState.PAUSED || alarm.state == AlarmState.RUNNING) {
+                                IconButton(
+                                    onClick = {
+                                        // Stop the alarm and reset to initial state
+                                        val repository = AlarmRepository(context)
+                                        val allAlarms = repository.loadAlarms()
+                                        val alarmIndex = allAlarms.indexOf(alarm)
+                                        val requestCode = alarmIndex + 1
+                                        
+                                        val alarmScheduler = AlarmScheduler(context)
+                                        alarmScheduler.cancelAlarm(requestCode)
+                                        
+                                        val stopIntent = Intent(context, ChainService::class.java).apply {
+                                            action = ChainService.ACTION_STOP_CHAIN
+                                        }
+                                        context.startService(stopIntent)
+                                        
+                                        onUpdate(alarm.copy(
+                                            isActive = false,
+                                            scheduledTime = 0L,
+                                            state = AlarmState.RESET,
+                                            totalDuration = 0L,
+                                            startTime = 0L
+                                        ))
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = "Reset",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                            }
+            }
+            
+            // Footer controls only shown when expanded (active state)
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Content
-            EditAlarmContent(
-                    alarm = alarm,
-                    onUpdate = onUpdate,
-                    onSchedule = onSchedule
+                // ===== FOOTER CONTROLS SECTION =====
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Add time button (only visible when running)
+                    if (alarm.state == AlarmState.RUNNING) {
+                        TextButton(
+                            onClick = {
+                                // Add 1 minute to remaining time by extending scheduled time
+                                val repository = AlarmRepository(context)
+                                val allAlarms = repository.loadAlarms()
+                                val alarmIndex = allAlarms.indexOf(alarm)
+                                val requestCode = alarmIndex + 1
+                                
+                                // Cancel existing alarm
+                                val alarmScheduler = AlarmScheduler(context)
+                                alarmScheduler.cancelAlarm(requestCode)
+                                
+                                // Calculate new end time (add 60 seconds)
+                                val newScheduledTime = alarm.scheduledTime + 60000
+                                val newTotalDuration = alarm.totalDuration + 60000
+                                
+                                // Reschedule with new time
+                                val delay = newScheduledTime - System.currentTimeMillis()
+                                onSchedule(delay)
+                                
+                                // Update alarm with extended time
+                                val newTotalSeconds = alarm.getTotalSeconds() + 60
+                                val h = newTotalSeconds / 3600
+                                val m = (newTotalSeconds % 3600) / 60
+                                val s = newTotalSeconds % 60
+                                onUpdate(alarm.copy(
+                                    hours = h,
+                                    minutes = m,
+                                    seconds = s,
+                                    scheduledTime = newScheduledTime,
+                                    totalDuration = newTotalDuration
+                                ))
+                            }
+                        ) {
+                            Text("+ 1:00", style = MaterialTheme.typography.labelMedium)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(60.dp))
+                    }
+                    
+                    // Main play/pause/stop button
+                    Button(
+                        onClick = {
+                            when (alarm.state) {
+                                AlarmState.RESET, AlarmState.PAUSED -> {
+                                    // Start or resume
+                                    val delay = alarm.getTotalSeconds() * 1000L
+                                    val now = System.currentTimeMillis()
+                                    onSchedule(delay)
+                                    onUpdate(alarm.copy(
+                                        isActive = true,
+                                        scheduledTime = now + delay,
+                                        state = AlarmState.RUNNING,
+                                        totalDuration = delay,
+                                        startTime = now
+                                    ))
+                                }
+                                AlarmState.RUNNING -> {
+                                    // Pause
+                                    val repository = AlarmRepository(context)
+                                    val allAlarms = repository.loadAlarms()
+                                    val alarmIndex = allAlarms.indexOf(alarm)
+                                    val requestCode = alarmIndex + 1
+                                    
+                                    val alarmScheduler = AlarmScheduler(context)
+                                    alarmScheduler.cancelAlarm(requestCode)
+                                    
+                                    onUpdate(alarm.copy(
+                                        isActive = false,
+                                        state = AlarmState.PAUSED
+                                    ))
+                                }
+                                AlarmState.EXPIRED -> {
+                                    // Stop
+                                    val stopIntent = Intent(context, ChainService::class.java).apply {
+                                        action = ChainService.ACTION_STOP_CHAIN
+                                    }
+                                    context.startService(stopIntent)
+                                    
+                                    onUpdate(alarm.copy(
+                                        isActive = false,
+                                        scheduledTime = 0L,
+                                        state = AlarmState.RESET,
+                                        totalDuration = 0L,
+                                        startTime = 0L
+                                    ))
+                                }
+                            }
+                        },
+                        enabled = alarm.getTotalSeconds() > 0,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = when (alarm.state) {
+                                AlarmState.EXPIRED -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.primary
+                            }
+                        ),
+                        modifier = Modifier.height(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = when (alarm.state) {
+                                AlarmState.RESET, AlarmState.PAUSED -> Icons.Outlined.PlayArrow
+                                AlarmState.RUNNING -> Icons.Outlined.Pause
+                                AlarmState.EXPIRED -> Icons.Outlined.Stop
+                            },
+                            contentDescription = when (alarm.state) {
+                                AlarmState.RESET, AlarmState.PAUSED -> "Play"
+                                AlarmState.RUNNING -> "Pause"
+                                AlarmState.EXPIRED -> "Stop"
+                            },
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            when (alarm.state) {
+                                AlarmState.RESET -> "START"
+                                AlarmState.PAUSED -> "RESUME"
+                                AlarmState.RUNNING -> "PAUSE"
+                                AlarmState.EXPIRED -> "STOP"
+                            }
+                        )
+                    }
+                }
+                
+                // Sound selector (compact)
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
+                            alarm.soundUri?.let { uri ->
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(uri))
+                            }
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                        }
+                        soundPickerLauncher.launch(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Outlined.MoreVert, null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = try {
+                            if (alarm.soundUri != null) {
+                                val ringtone = RingtoneManager.getRingtone(context, Uri.parse(alarm.soundUri))
+                                ringtone.getTitle(context)
+                            } else {
+                                "Default Alarm Sound"
+                            }
+                        } catch (e: Exception) {
+                            "Custom Sound"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+    
+    // Name edit dialog
+    if (showNameDialog) {
+        var tempName by remember { mutableStateOf(alarm.name) }
+        AlertDialog(
+            onDismissRequest = { showNameDialog = false },
+            title = { Text("Edit Alarm Name") },
+            text = {
+                OutlinedTextField(
+                    value = tempName,
+                    onValueChange = { tempName = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onUpdate(alarm.copy(name = tempName))
+                        showNameDialog = false
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Duration picker (reuse existing bottom sheet)
+    if (showTimePicker) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showTimePicker = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Set Duration",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+
+                SimpleDurationPicker(
+                    hours = alarm.hours,
+                    minutes = alarm.minutes,
+                    seconds = alarm.seconds,
+                    onTimeChange = { h, m, s ->
+                        onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false, state = AlarmState.RESET))
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Quick Add
+                Text(
+                    "Quick Add", 
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(), 
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    listOf(5, 10, 30, 60).forEach { sec ->
+                        OutlinedButton(
+                            onClick = {
+                                val currentTotal = alarm.getTotalSeconds()
+                                val newTotal = currentTotal + sec
+                                val h = newTotal / 3600
+                                val m = (newTotal % 3600) / 60
+                                val s = newTotal % 60
+                                onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false, state = AlarmState.RESET))
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                        ) {
+                            Text("+${if (sec < 60) "${sec}s" else "${sec/60}m"}", fontSize = 12.sp)
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Button(
+                    onClick = { showTimePicker = false },
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    Text("Done")
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1149,7 +1607,7 @@ fun EditAlarmContent(
             onClick = { showTimePicker = true },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Default.MoreVert, null)
+            Icon(Icons.Outlined.Edit, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(alarm.getFormattedTime())
         }
@@ -1172,7 +1630,7 @@ fun EditAlarmContent(
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Default.MoreVert, null)
+            Icon(Icons.Outlined.MoreVert, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(getSoundName(alarm.soundUri))
         }
@@ -1185,7 +1643,7 @@ fun EditAlarmContent(
             modifier = Modifier.fillMaxWidth(),
             enabled = !alarm.isActive && alarm.getTotalSeconds() > 0
         ) {
-            Icon(Icons.Default.PlayArrow, null)
+            Icon(Icons.Outlined.PlayArrow, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.start_alarm_now))
         }
@@ -1223,7 +1681,7 @@ fun EditAlarmContent(
                     contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Icon(Icons.Default.Delete, null)
+                Icon(Icons.Outlined.Delete, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Stop Alarm")
             }
@@ -1409,3 +1867,4 @@ fun formatTime(seconds: Int): String {
            else if (m > 0) String.format(Locale.getDefault(), "%d:%02d", m, s)
            else "${s}s"
 }
+

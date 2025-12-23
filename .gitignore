@@ -7,3 +7,4 @@ local.properties
 .gradle/
 .idea/
 *.iml
+TIMER_UI_SUMMARY.md
