@@ -1131,42 +1131,55 @@ fun AlarmItem(
             // 2. Chain is NOT active (Stop detected) AND this alarm thinks it's running
             
             val isRemoteActive = isChainActive && chainIndex == index
+            val isAlarmRinging = chainManager.isAlarmRinging()
             
             if (isRemoteActive) {
-                // Remote is Active: Sync Pause/Resume state
-                val isRemotePaused = chainManager.isChainPaused()
+                // Remote is Active
                 
-                if (isRemotePaused && activeAlarm.state != AlarmState.PAUSED) {
-                    val remaining = chainManager.getPausedRemainingTime()
-                    Log.d("AlarmItem", "SYNC: Notification PAUSE detected -> Pausing UI")
-                    onUpdate(activeAlarm.copy(
-                        isActive = false, // Local convention for paused
-                        state = AlarmState.PAUSED,
-                        pausedRemainingMs = remaining
-                    ))
-                } else if (!isRemotePaused && activeAlarm.state != AlarmState.RUNNING) {
-                    val endTime = chainManager.getEndTime()
-                    Log.d("AlarmItem", "SYNC: Notification RESUME detected -> Resuming UI")
-                    onUpdate(activeAlarm.copy(
-                        isActive = true,
-                        state = AlarmState.RUNNING,
-                        scheduledTime = endTime,
-                        pausedRemainingMs = 0L,
-                        // Update startTime to avoid jumps in progress if logic mistakenly uses it
-                        startTime = System.currentTimeMillis()
-                    ))
+                // CHECK IF RINGING FIRST
+                if (isAlarmRinging) {
+                    if (activeAlarm.state != AlarmState.EXPIRED) {
+                         Log.d("AlarmItem", "SYNC: Alarm RINGING detected -> Setting EXPIRED state")
+                         onUpdate(activeAlarm.copy(
+                             isActive = true,
+                             state = AlarmState.EXPIRED,
+                             scheduledTime = 0L // Done counting
+                         ))
+                    }
+                } else {
+                    // Not ringing, check Pause/Resume
+                    val isRemotePaused = chainManager.isChainPaused()
+                    
+                    if (isRemotePaused && activeAlarm.state != AlarmState.PAUSED) {
+                        val remaining = chainManager.getPausedRemainingTime()
+                        Log.d("AlarmItem", "SYNC: Notification PAUSE detected -> Pausing UI")
+                        onUpdate(activeAlarm.copy(
+                            isActive = false, // Local convention for paused
+                            state = AlarmState.PAUSED,
+                            pausedRemainingMs = remaining
+                        ))
+                    } else if (!isRemotePaused && activeAlarm.state != AlarmState.RUNNING) {
+                        val endTime = chainManager.getEndTime()
+                        Log.d("AlarmItem", "SYNC: Notification RESUME detected -> Resuming UI")
+                        onUpdate(activeAlarm.copy(
+                            isActive = true,
+                            state = AlarmState.RUNNING,
+                            scheduledTime = endTime,
+                            pausedRemainingMs = 0L,
+                            // Update startTime to avoid jumps in progress if logic mistakenly uses it
+                            startTime = System.currentTimeMillis()
+                        ))
+                    }
                 }
             } else {
                 // Remote is NOT Active (STOPPED or different alarm)
                 // If local state is Running/Paused, we must Reset (Stop detected)
                 
-                // CRITICAL FIX: Grace period!
-                // Don't reset immediately if we just started (within 1.5s)
-                // This gives ChainService time to start and update SharedPreferences
+                // Grace period check
                 val timeSinceStart = System.currentTimeMillis() - localStartTime
-                val inGracePeriod = activeAlarm.isActive && timeSinceStart < 1500
+                val inGracePeriod = activeAlarm.isActive && timeSinceStart < 500 // Reduced grace period since Service is fixed
                 
-                if (!inGracePeriod && (activeAlarm.state == AlarmState.RUNNING || activeAlarm.state == AlarmState.PAUSED)) {
+                if (!inGracePeriod && (activeAlarm.state == AlarmState.RUNNING || activeAlarm.state == AlarmState.PAUSED || activeAlarm.state == AlarmState.EXPIRED)) {
                     Log.d("AlarmItem", "SYNC: Notification STOP detected -> Resetting UI (grace=${timeSinceStart}ms)")
                     onUpdate(activeAlarm.copy(
                         isActive = false,
@@ -1199,14 +1212,10 @@ fun AlarmItem(
             remainingTime = (alarm.pausedRemainingMs / 1000).toInt().coerceAtLeast(0)
             displayProgress = alarm.getProgress()
         }
-    }
-    
-    // Auto-reset when timer expires
-    LaunchedEffect(alarm.isActive, alarm.scheduledTime) {
-        if (alarm.isActive && alarm.scheduledTime > 0) {
-            val remaining = alarm.scheduledTime - System.currentTimeMillis()
-            if (remaining > 0) delay(remaining)
-            onUpdate(alarm.copy(isActive = false, scheduledTime = 0L, state = AlarmState.RESET))
+        // When expired (ringing), show full progress
+        else if (alarm.state == AlarmState.EXPIRED) {
+            remainingTime = 0
+            displayProgress = 1f
         }
     }
     
