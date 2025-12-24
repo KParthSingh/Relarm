@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1066,12 +1067,7 @@ fun AlarmItem(
             .fillMaxWidth()
             .animateContentSize(), // Smooth height animation
         colors = CardDefaults.cardColors(
-            containerColor = when (alarm.state) {
-                AlarmState.RUNNING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                AlarmState.PAUSED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                AlarmState.EXPIRED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-                else -> MaterialTheme.colorScheme.surface
-            },
+            containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface
         ),
         shape = RoundedCornerShape(16.dp),
@@ -1101,9 +1097,9 @@ fun AlarmItem(
                         .padding(6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Add,
+                        imageVector = Icons.Outlined.TextFields,
                         contentDescription = "Edit label",
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.width(6.dp))
