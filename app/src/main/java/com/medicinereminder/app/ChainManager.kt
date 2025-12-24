@@ -40,6 +40,12 @@ class ChainManager(private val context: Context) {
     fun isChainActive(): Boolean {
         return prefs.getBoolean(KEY_CHAIN_ACTIVE, false)
     }
+
+    fun setChainActive(isActive: Boolean) {
+        prefs.edit()
+            .putBoolean(KEY_CHAIN_ACTIVE, isActive)
+            .apply()
+    }
     
     fun getCurrentIndex(): Int {
         return prefs.getInt(KEY_CURRENT_INDEX, 0)

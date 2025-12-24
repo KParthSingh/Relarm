@@ -53,6 +53,11 @@ class ChainService : Service() {
         // Store endTime in ChainManager for recalculation after backgrounding
         chainManager.setEndTime(endTime)
         
+        // CRITICAL FIX: Explicitly update ChainManager state!
+        // The UI reads from here, so we MUST ensure these are set correctly.
+        chainManager.setChainActive(true)
+        chainManager.setCurrentIndex(currentIndex)
+        
         // CRITICAL FIX: Save service state for recovery if app is killed
         chainManager.saveServiceState(currentIndex, endTime, totalAlarms, currentAlarmName)
         
