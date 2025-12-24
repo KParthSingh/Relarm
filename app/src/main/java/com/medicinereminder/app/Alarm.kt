@@ -20,7 +20,8 @@ data class Alarm(
     val soundUri: String? = null, // URI of custom alarm sound, null = use default
     val state: AlarmState = AlarmState.RESET,
     val totalDuration: Long = 0L, // Total duration in milliseconds for progress calculation
-    val startTime: Long = 0L // When alarm started (for progress calculation)
+    val startTime: Long = 0L, // When alarm started (for progress calculation)
+    val pausedRemainingMs: Long = 0L // Remaining time when paused (0 if not paused)
 ) {
     fun getTotalSeconds(): Int = hours * 3600 + minutes * 60 + seconds
     
@@ -41,14 +42,26 @@ data class Alarm(
         }
     }
     
-    fun clone(): Alarm = this.copy(id = UUID.randomUUID().toString(), isActive = false, scheduledTime = 0L, state = AlarmState.RESET)
+    fun clone(): Alarm = this.copy(id = UUID.randomUUID().toString(), isActive = false, scheduledTime = 0L, state = AlarmState.RESET, pausedRemainingMs = 0L)
     
     // Calculate progress from 0.0 (start) to 1.0 (complete)
     fun getProgress(): Float {
-        if (totalDuration <= 0 || state == AlarmState.RESET) return 0f
+        if (state == AlarmState.RESET) return 0f
         if (state == AlarmState.EXPIRED) return 1f
         
-        val elapsed = System.currentTimeMillis() - startTime
-        return (elapsed.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+        // Get the original total duration from hours/minutes/seconds
+        val originalTotalMs = getTotalSeconds() * 1000L
+        if (originalTotalMs <= 0) return 0f
+        
+        val remainingMs = if (state == AlarmState.PAUSED) {
+            // When paused, use saved paused time
+            pausedRemainingMs
+        } else {
+            // When running, calculate from scheduledTime (same as time display!)
+            (scheduledTime - System.currentTimeMillis()).coerceAtLeast(0)
+        }
+        
+        val elapsed = originalTotalMs - remainingMs
+        return (elapsed.toFloat() / originalTotalMs.toFloat()).coerceIn(0f, 1f)
     }
 }

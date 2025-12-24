@@ -420,6 +420,7 @@ class ChainService : Service() {
     }
 
     private fun handlePause() {
+        Log.d("ChainService", "========== PAUSE TIMER ==========")
         Log.d("ChainService", "handlePause() called")
         // No loop to cancel
         // countdownJob?.cancel()
@@ -440,23 +441,29 @@ class ChainService : Service() {
         alarmScheduler.cancelAlarm(requestCode)
         
         Log.d("ChainService", "Remaining time: ${remaining}s (${remaining * 1000}ms)")
+        Log.d("TimerSync", "[PAUSE] Saving remaining time: ${remaining * 1000}ms")
         
         Log.d("ChainService", "Before pause - isPaused: ${ChainManager(this).isChainPaused()}")
         ChainManager(this).pauseChain(remaining * 1000L)
         Log.d("ChainService", "After pause - isPaused: ${ChainManager(this).isChainPaused()}")
         Log.d("ChainService", "Saved remaining time: ${ChainManager(this).getPausedRemainingTime()}ms")
         
+        DebugLogger.info("TimerSync", "PAUSED: savedTime=${remaining * 1000}ms, endTime=$endTime cleared")
+        
         // Only show paused notification if not dismissed
         if (shouldShowNotification()) {
             showNotification(isPaused = true)
         }
         Log.d("ChainService", "Pause complete")
+        Log.d("ChainService", "=================================")
     }
 
     private fun handleResume() {
+        Log.d("ChainService", "========== RESUME TIMER ==========")
         Log.d("ChainService", "handleResume() called")
         val remainingTimeMs = ChainManager(this).getPausedRemainingTime()
         Log.d("ChainService", "Retrieved paused remaining time: ${remainingTimeMs}ms")
+        Log.d("TimerSync", "[RESUME] Reading saved time: ${remainingTimeMs}ms")
         
         // CRITICAL FIX: Don't resume if paused time is 0 or negative
         if (remainingTimeMs <= 1000) {
@@ -474,8 +481,10 @@ class ChainService : Service() {
         alarmScheduler.scheduleAlarm(remainingTimeMs, requestCode)
         
         // Reset end time relative to now
+        val oldEndTime = endTime
         endTime = System.currentTimeMillis() + remainingTimeMs
-        Log.d("ChainService", "New endTime calculated: $endTime")
+        Log.d("ChainService", "New endTime calculated: $endTime (was: $oldEndTime)")
+        Log.d("TimerSync", "[RESUME] Calculated new endTime: now=${System.currentTimeMillis()} + ${remainingTimeMs}ms = $endTime")
         
         Log.d("ChainService", "Before resume - isPaused: ${ChainManager(this).isChainPaused()}")
         ChainManager(this).resumeChain()
@@ -486,6 +495,7 @@ class ChainService : Service() {
         Log.d("ChainService", "Restarting countdown (preserving dismissal state)...")
         startCountdown(resetDismissalState = false)
         Log.d("ChainService", "Resume complete")
+        Log.d("ChainService", "==================================")
     }
 
     
