@@ -24,7 +24,22 @@ data class Alarm(
 ) {
     fun getTotalSeconds(): Int = hours * 3600 + minutes * 60 + seconds
     
-    fun getFormattedTime(): String = String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    fun getFormattedTime(): String {
+        return when {
+            hours > 0 -> {
+                // Show hours and minutes: "1:05:30" or "2:00:00"
+                String.format("%d:%02d:%02d", hours, minutes, seconds)
+            }
+            minutes > 0 -> {
+                // Show minutes and seconds: "5:30" or "1:00"
+                String.format("%d:%02d", minutes, seconds)
+            }
+            else -> {
+                // Show seconds only: "30 secs" or "5 secs"
+                "$seconds Secs"
+            }
+        }
+    }
     
     fun clone(): Alarm = this.copy(id = UUID.randomUUID().toString(), isActive = false, scheduledTime = 0L, state = AlarmState.RESET)
     
