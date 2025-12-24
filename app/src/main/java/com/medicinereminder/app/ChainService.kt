@@ -283,6 +283,22 @@ class ChainService : Service() {
         Log.d("ChainService", "Current state - Index: $currentIndex, EndTime: $endTime")
         Log.d("ChainService", "ChainManager state - Active: ${ChainManager(this).isChainActive()}, Paused: ${ChainManager(this).isChainPaused()}")
         
+        // CRITICAL FIX: Proactive State Restoration
+        // If service is fresh (endTime=0) but ChainManager says we should be running, restore state immediately.
+        // This ensures actions like ACTION_PAUSE_CHAIN work even if service was killed and recreated.
+        val chainManager = ChainManager(this)
+        if (endTime == 0L && chainManager.isChainActive()) {
+             val savedEndTime = chainManager.getServiceEndTime()
+             // Only restore if valid. Note: savedEndTime is absolute time.
+             if (savedEndTime > 0) {
+                 endTime = savedEndTime
+                 currentIndex = chainManager.getServiceCurrentIndex()
+                 totalAlarms = chainManager.getServiceTotalAlarms()
+                 currentAlarmName = chainManager.getServiceAlarmName()
+                 DebugLogger.warn("ChainService", "STATE RESTORED in onStartCommand (Pre-Action): index=$currentIndex, endTime=$endTime")
+             }
+        }
+
         when (intent?.action) {
             ACTION_START_CHAIN_ALARM -> {
                 Log.d("ChainService", ">>> ACTION_START_CHAIN_ALARM received")
