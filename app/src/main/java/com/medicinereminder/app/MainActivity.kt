@@ -919,7 +919,7 @@ fun StickyChainBar(
                 Log.d("TimerSync", "[UI] Time updated: $oldRemainingMs -> $remainingTimeMs (paused=$paused, endTime=$endTime)")
             }
             
-            delay(100) // Poll at 100ms for smooth countdown display
+            delay(1000) // Poll at 1000ms (1s) for text countdown display
         }
     }
 
@@ -1196,26 +1196,33 @@ fun AlarmItem(
     }
     
     // Update progress and remaining time in real-time
-    LaunchedEffect(alarm.state, alarm.isActive, alarm.pausedRemainingMs, alarm.scheduledTime) {
-        while (alarm.state == AlarmState.RUNNING && alarm.isActive) {
-            displayProgress = alarm.getProgress()
-            
-            // CRITICAL: Calculate remaining time from scheduledTime (same as ChainService)
-            // This ensures UI matches notification exactly, even after resume
-            val remaining = ((alarm.scheduledTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
-            remainingTime = remaining
-            
-            delay(100) // Update 10 times per second for smooth animation
-        }
-        
-        // When paused, update display to show paused remaining time
-        if (alarm.state == AlarmState.PAUSED) {
+    // Loop 1: Text Update (1Hz)
+    LaunchedEffect(alarm.state, alarm.isActive, alarm.scheduledTime, alarm.pausedRemainingMs) {
+        if (alarm.state == AlarmState.RUNNING && alarm.isActive) {
+            while (isActive) {
+                // Update text every second
+                val remaining = ((alarm.scheduledTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
+                remainingTime = remaining
+                delay(1000)
+            }
+        } else if (alarm.state == AlarmState.PAUSED) {
             remainingTime = (alarm.pausedRemainingMs / 1000).toInt().coerceAtLeast(0)
-            displayProgress = alarm.getProgress()
-        }
-        // When expired (ringing), show full progress
-        else if (alarm.state == AlarmState.EXPIRED) {
+        } else if (alarm.state == AlarmState.EXPIRED) {
             remainingTime = 0
+        }
+    }
+    
+    // Loop 2: Animation Update (60fps / High Refresh Rate)
+    LaunchedEffect(alarm.state, alarm.isActive, alarm.scheduledTime, alarm.pausedRemainingMs) {
+        if (alarm.state == AlarmState.RUNNING && alarm.isActive) {
+            while (isActive) {
+                withFrameMillis { 
+                     displayProgress = alarm.getProgress()
+                }
+            }
+        } else if (alarm.state == AlarmState.PAUSED) {
+            displayProgress = alarm.getProgress()
+        } else if (alarm.state == AlarmState.EXPIRED) {
             displayProgress = 1f
         }
     }
