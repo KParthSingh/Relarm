@@ -3,6 +3,10 @@ package com.medicinereminder.app
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 
 class AlarmRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("alarms", Context.MODE_PRIVATE)
@@ -26,4 +30,21 @@ class AlarmRepository(private val context: Context) {
     fun clearAllAlarms() {
         prefs.edit().clear().apply()
     }
+
+    fun getAlarmsFlow(): kotlinx.coroutines.flow.Flow<List<Alarm>> = callbackFlow {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "alarm_list") {
+                trySend(loadAlarms())
+            }
+        }
+        
+        // Emit initial value
+        trySend(loadAlarms())
+        
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }.flowOn(Dispatchers.IO)
 }

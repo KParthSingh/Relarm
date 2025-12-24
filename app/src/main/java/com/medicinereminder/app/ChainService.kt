@@ -257,6 +257,7 @@ class ChainService : Service() {
         const val ACTION_RESUME_CHAIN = "com.medicinereminder.app.RESUME_CHAIN"
         const val ACTION_NEXT_ALARM = "com.medicinereminder.app.NEXT_ALARM"
         const val ACTION_PREV_ALARM = "com.medicinereminder.app.PREV_ALARM"
+        const val ACTION_JUMP_TO_ALARM = "com.medicinereminder.app.JUMP_TO_ALARM"
         const val ACTION_PAUSE_COUNTDOWN_LOOP = "com.medicinereminder.app.PAUSE_COUNTDOWN_LOOP"
         const val ACTION_RESUME_COUNTDOWN_LOOP = "com.medicinereminder.app.RESUME_COUNTDOWN_LOOP"
         const val ACTION_TRIGGER_ALARM = "com.medicinereminder.app.TRIGGER_ALARM"
@@ -266,6 +267,7 @@ class ChainService : Service() {
         const val EXTRA_TOTAL_ALARMS = "total_alarms"
         const val EXTRA_ALARM_NAME = "alarm_name"
         const val EXTRA_IS_CHAIN = "is_chain"
+        const val EXTRA_TARGET_INDEX = "target_index"
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -375,6 +377,13 @@ class ChainService : Service() {
             ACTION_PREV_ALARM -> {
                 Log.d("ChainService", ">>> ACTION_PREV_ALARM received")
                 handlePrevAlarm()
+            }
+            ACTION_JUMP_TO_ALARM -> {
+                val targetIndex = intent.getIntExtra(EXTRA_TARGET_INDEX, -1)
+                Log.d("ChainService", ">>> ACTION_JUMP_TO_ALARM received, targetIndex=$targetIndex")
+                if (targetIndex >= 0) {
+                    handleJumpToAlarm(targetIndex)
+                }
             }
             ACTION_PAUSE_COUNTDOWN_LOOP -> {
                 Log.d("ChainService", ">>> ACTION_PAUSE_COUNTDOWN_LOOP received")
@@ -656,6 +665,62 @@ class ChainService : Service() {
         } else {
             Log.d("ChainService", "Already at first alarm, cannot go back")
         }
+    }
+    
+    private fun handleJumpToAlarm(targetIndex: Int) {
+        Log.d("ChainService", "handleJumpToAlarm() called with targetIndex=$targetIndex")
+        
+        // Clear alarm ringing state
+        ChainManager(this).setAlarmRinging(false)
+        
+        // Stop any currently ringing alarm
+        val stopAlarmIntent = Intent(this, AlarmService::class.java)
+        stopService(stopAlarmIntent)
+        
+        // Cancel current scheduled alarm
+        val alarmScheduler = AlarmScheduler(this)
+        alarmScheduler.cancelAlarm(currentIndex + 1)
+        
+        // Get alarm repository
+        val repository = AlarmRepository(this)
+        val alarms = repository.loadAlarms()
+        
+        // Validate target index
+        if (targetIndex < 0 || targetIndex >= alarms.size) {
+            Log.e("ChainService", "Invalid target index: $targetIndex (total alarms: ${alarms.size})")
+            return
+        }
+        
+        Log.d("ChainService", "Jumping to alarm at index $targetIndex")
+        
+        // Update ChainManager with new index
+        val chainManager = ChainManager(this)
+        chainManager.setCurrentIndex(targetIndex)
+        chainManager.resumeChain() // Clear any pause state
+        
+        // Start the target alarm
+        val targetAlarm = alarms[targetIndex]
+        val delayMillis = targetAlarm.getTotalSeconds() * 1000L
+        val newEndTime = System.currentTimeMillis() + delayMillis
+        
+        // Schedule with AlarmManager
+        alarmScheduler.scheduleAlarm(delayMillis, targetIndex + 1)
+        
+        // Update service state
+        currentIndex = targetIndex
+        totalAlarms = alarms.size
+        currentAlarmName = targetAlarm.name
+        endTime = newEndTime
+        
+        // Update repository
+        val updatedAlarms = alarms.toMutableList()
+        updatedAlarms[targetIndex] = targetAlarm.copy(isActive = true, scheduledTime = newEndTime)
+        repository.saveAlarms(updatedAlarms)
+        
+        // Start countdown for target alarm
+        startCountdown()
+        
+        Log.d("ChainService", "Successfully jumped to alarm at index $targetIndex")
     }
     
     private fun handlePauseCountdownLoop() {

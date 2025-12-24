@@ -18,7 +18,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.basicMarquee
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
@@ -276,41 +275,26 @@ fun MainScreen(
     var alarms by remember { mutableStateOf(repository.loadAlarms()) }
     
     val chainManager = remember { ChainManager(context) }
-    var isChainActive by remember { mutableStateOf(chainManager.isChainActive()) }
-    var isPaused by remember { mutableStateOf(chainManager.isChainPaused()) }
-    var currentChainIndex by remember { mutableIntStateOf(chainManager.getCurrentIndex()) }
-    var isAlarmRinging by remember { mutableStateOf(false) }
-    var isChainSequence by remember { mutableStateOf(true) } // Default to true
+    // OPTIMIZATION: Use Flow instead of Polling
+    val chainState by chainManager.getChainStateFlow().collectAsState(initial = chainManager.getChainState())
+    
+    val isChainActive = chainState.isChainActive
+    val isPaused = chainState.isPaused
+    val currentChainIndex = chainState.currentIndex
+    val isAlarmRinging = chainState.isAlarmRinging
+    val isChainSequence = chainState.isChainSequence
 
-    // Sync State Loop
-    var logCounter by remember { mutableIntStateOf(0) }
+    // Observe Alarms Flow (Hybrid approach to support Drag & Drop)
     LaunchedEffect(Unit) {
-        while (true) {
-            alarms = repository.loadAlarms()
-            isChainActive = chainManager.isChainActive()
-            isPaused = chainManager.isChainPaused()
-            currentChainIndex = chainManager.getCurrentIndex()
-            isChainSequence = chainManager.isChainSequence()
-            
-            // Check if alarm is ringing from ChainManager state
-            isAlarmRinging = chainManager.isAlarmRinging()
-            
-            // Log state snapshot every 10 seconds to avoid spam
-            logCounter++
-            if (logCounter % 10 == 0) {
-                DebugLogger.logState("MainScreen-UI", mapOf(
-                    "isChainActive" to isChainActive,
-                    "isPaused" to isPaused,
-                    "currentChainIndex" to currentChainIndex,
-                    "isAlarmRinging" to isAlarmRinging,
-                    "isChainSequence" to isChainSequence,
-                    "totalAlarms" to alarms.size
-                ))
+        repository.getAlarmsFlow().collect { newAlarms ->
+            if (newAlarms != alarms) {
+                // Only update if content changed remotely
+                alarms = newAlarms
             }
-            
-            delay(1000) // Poll every second for updates from Service/Receiver
         }
     }
+
+
     
     LaunchedEffect(alarms) {
         repository.saveAlarms(alarms)
@@ -1114,6 +1098,7 @@ fun AlarmItem(
     var showNameDialog by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showSoundPicker by remember { mutableStateOf(false) }
+    var showJumpConfirmation by remember { mutableStateOf(false) }
     
     // Calculate current progress for visual display
     var displayProgress by remember { mutableFloatStateOf(alarm.getProgress()) }
@@ -1243,6 +1228,37 @@ fun AlarmItem(
             val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
             onUpdate(alarm.copy(soundUri = uri?.toString()))
         }
+    }
+    
+    // Confirmation dialog for jumping to this alarm during active sequence
+    if (showJumpConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showJumpConfirmation = false },
+            title = { Text("Switch Alarm?") },
+            text = { 
+                Text("A sequence is currently running. Do you want to switch to this alarm? The sequence will continue from this alarm.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showJumpConfirmation = false
+                        // Send jump command to ChainService
+                        val jumpIntent = Intent(context, ChainService::class.java).apply {
+                            action = ChainService.ACTION_JUMP_TO_ALARM
+                            putExtra(ChainService.EXTRA_TARGET_INDEX, index)
+                        }
+                        context.startService(jumpIntent)
+                    }
+                ) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showJumpConfirmation = false }) {
+                    Text("No")
+                }
+            }
+        )
     }
     
     val isExpanded = alarm.state != AlarmState.RESET
@@ -1440,16 +1456,27 @@ fun AlarmItem(
                     // Start button on right
                     Button(
                         onClick = {
-                            val delay = alarm.getTotalSeconds() * 1000L
-                            val now = System.currentTimeMillis()
-                            onSchedule(delay)
-                            onUpdate(alarm.copy(
-                                isActive = true,
-                                scheduledTime = now + delay,
-                                state = AlarmState.RUNNING,
-                                totalDuration = delay,
-                                startTime = now
-                            ))
+                            // Check if a chain is currently active
+                            val chainManager = ChainManager(context)
+                            val isChainActive = chainManager.isChainActive()
+                            val currentChainIndex = chainManager.getCurrentIndex()
+                            
+                            if (isChainActive && currentChainIndex != index) {
+                                // Show confirmation dialog to switch alarms
+                                showJumpConfirmation = true
+                            } else {
+                                // Normal start for single alarm or if chain not active
+                                val delay = alarm.getTotalSeconds() * 1000L
+                                val now = System.currentTimeMillis()
+                                onSchedule(delay)
+                                onUpdate(alarm.copy(
+                                    isActive = true,
+                                    scheduledTime = now + delay,
+                                    state = AlarmState.RUNNING,
+                                    totalDuration = delay,
+                                    startTime = now
+                                ))
+                            }
                         },
                         enabled = alarm.getTotalSeconds() > 0,
                         modifier = Modifier.height(36.dp)

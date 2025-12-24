@@ -1,6 +1,10 @@
 package com.medicinereminder.app
 
 import android.content.Context
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 
 class ChainManager(private val context: Context) {
     private val prefs = context.getSharedPreferences("chain_prefs", Context.MODE_PRIVATE)
@@ -220,4 +224,43 @@ class ChainManager(private val context: Context) {
     fun getServiceAlarmName(): String {
         return prefs.getString(KEY_SERVICE_ALARM_NAME, "") ?: ""
     }
+
+    fun getChainState(): ChainState {
+        return ChainState(
+            isChainActive = isChainActive(),
+            isPaused = isChainPaused(),
+            currentIndex = getCurrentIndex(),
+            isAlarmRinging = isAlarmRinging(),
+            isChainSequence = isChainSequence()
+        )
+    }
+
+    fun getChainStateFlow(): kotlinx.coroutines.flow.Flow<ChainState> = callbackFlow {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_CHAIN_ACTIVE || 
+                key == KEY_CURRENT_INDEX || 
+                key == KEY_IS_PAUSED || 
+                key == KEY_IS_ALARM_RINGING || 
+                key == KEY_IS_CHAIN_SEQUENCE) {
+                trySend(getChainState())
+            }
+        }
+        
+        // Emit initial value
+        trySend(getChainState())
+        
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }.flowOn(Dispatchers.IO)
 }
+
+data class ChainState(
+    val isChainActive: Boolean = false,
+    val isPaused: Boolean = false,
+    val currentIndex: Int = 0,
+    val isAlarmRinging: Boolean = false,
+    val isChainSequence: Boolean = true
+)
