@@ -231,7 +231,9 @@ class ChainManager(private val context: Context) {
             isPaused = isChainPaused(),
             currentIndex = getCurrentIndex(),
             isAlarmRinging = isAlarmRinging(),
-            isChainSequence = isChainSequence()
+            isChainSequence = isChainSequence(),
+            endTime = getEndTime(),
+            pausedRemainingTime = getPausedRemainingTime()
         )
     }
 
@@ -241,7 +243,9 @@ class ChainManager(private val context: Context) {
                 key == KEY_CURRENT_INDEX || 
                 key == KEY_IS_PAUSED || 
                 key == KEY_IS_ALARM_RINGING || 
-                key == KEY_IS_CHAIN_SEQUENCE) {
+                key == KEY_IS_CHAIN_SEQUENCE ||
+                key == KEY_END_TIME ||
+                key == KEY_REMAINING_TIME) {
                 trySend(getChainState())
             }
         }
@@ -262,5 +266,7 @@ data class ChainState(
     val isPaused: Boolean = false,
     val currentIndex: Int = 0,
     val isAlarmRinging: Boolean = false,
-    val isChainSequence: Boolean = true
+    val isChainSequence: Boolean = true,
+    val endTime: Long = 0L,
+    val pausedRemainingTime: Long = 0L
 )

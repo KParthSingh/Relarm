@@ -272,8 +272,17 @@ fun MainScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { AlarmRepository(context) }
-    var alarms by remember { mutableStateOf(repository.loadAlarms()) }
+    // OPTIMIZED: Use SnapshotStateList for efficient O(1) mutations
+    // We initialise it with an empty list first, then populate it
+    val alarms = remember { mutableStateListOf<Alarm>() }
     
+    // Initial load
+    LaunchedEffect(Unit) {
+        val loaded = repository.loadAlarms()
+        alarms.clear()
+        alarms.addAll(loaded)
+    }
+
     val chainManager = remember { ChainManager(context) }
     // OPTIMIZATION: Use Flow instead of Polling
     val chainState by chainManager.getChainStateFlow().collectAsState(initial = chainManager.getChainState())
@@ -287,25 +296,31 @@ fun MainScreen(
     // Observe Alarms Flow (Hybrid approach to support Drag & Drop)
     LaunchedEffect(Unit) {
         repository.getAlarmsFlow().collect { newAlarms ->
-            if (newAlarms != alarms) {
-                // Only update if content changed remotely
-                alarms = newAlarms
+            // Only update if content changed remotely AND we are not dragging?
+            // For now, simple diff check. 
+            // Only effective way to check efficiently is if sizes or IDs differ
+            if (newAlarms.size != alarms.size || newAlarms.map { it.id } != alarms.map { it.id }) {
+                 // Make sure we don't clobber local state if it's identical
+                 // (This is a simplified check, proper would be deep equals but expensive)
+                 alarms.clear()
+                 alarms.addAll(newAlarms)
             }
         }
     }
-
-
     
-    LaunchedEffect(alarms) {
-        repository.saveAlarms(alarms)
+    // Helper to save state explicitly
+    fun saveAlarms() {
+        val currentList = alarms.toList() // Snapshot
+        repository.saveAlarms(currentList)
+        android.util.Log.d("DragOptimizer", "Saved ${currentList.size} alarms to persistence")
     }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // REMOVED: LaunchedEffect(alarms) auto-saver to prevent lag during drag
+
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = { 
                     Text(stringResource(R.string.title_main))
                 },
@@ -317,10 +332,8 @@ fun MainScreen(
                         )
                     }
                 },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -333,7 +346,8 @@ fun MainScreen(
                         val h = defaultSeconds / 3600
                         val m = (defaultSeconds % 3600) / 60
                         val s = defaultSeconds % 60
-                        alarms = alarms + Alarm(hours = h, minutes = m, seconds = s)
+                        alarms.add(Alarm(hours = h, minutes = m, seconds = s))
+                        saveAlarms() // Save on add
                     },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -377,7 +391,12 @@ fun MainScreen(
                             android.util.Log.d("MainActivity", "Stop intent sent")
                             
                             // Also clear all active alarms
-                            alarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
+                            alarms.forEachIndexed { i, a ->
+                                if (a.isActive || a.scheduledTime != 0L) {
+                                    alarms[i] = a.copy(isActive = false, scheduledTime = 0L)
+                                }
+                            }
+                            saveAlarms() // Save on stop
                         },
                         onDismiss = {
                             android.util.Log.d("MainActivity", "DISMISS button clicked! Stopping alarm")
@@ -419,9 +438,10 @@ fun MainScreen(
                             val firstAlarm = alarms[0]
                             val delay = firstAlarm.getTotalSeconds() * 1000L
                             onScheduleAlarm(delay, 1, firstAlarm.name, 0, alarms.size, true)
-                            alarms = alarms.toMutableList().apply {
-                                set(0, firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay))
-                            }
+                            
+                            // efficient update
+                            alarms[0] = firstAlarm.copy(isActive = true, scheduledTime = System.currentTimeMillis() + delay)
+                            saveAlarms() // Save on start
                             
                             // Check if close-on-start is enabled
                             if (settingsRepository.getCloseOnStart()) {
@@ -466,6 +486,7 @@ fun MainScreen(
         var totalDragOffsetY by remember { mutableFloatStateOf(0f) }
         var autoScrollSpeed by remember { mutableFloatStateOf(0f) }
         var lastSwapTime by remember { mutableLongStateOf(0L) }
+        var lastSwapDirection by remember { mutableIntStateOf(0) } // 1=down, -1=up, 0=none
         
         // Map to store original indices when drag starts
         // We moved this up to be accessible for Overlay
@@ -543,8 +564,8 @@ fun MainScreen(
                                             val spacingPx = with(density) { spacing.toPx() }
                                             val currentTime = System.currentTimeMillis()
                                             
-                                            // Debounce check: prevent swaps if less than 150ms passed since last swap
-                                            // This prevents "zipping" where stale layout coordinates trigger multiple swaps
+                                            // STABILIZED: Increased debounce to prevent layout-triggered oscillation
+                                            // Layout needs time to settle after swap before next check
                                             if (currentTime - lastSwapTime > 150) { 
                                                 val currentIndex = alarms.indexOfFirst { it.id == draggedAlarmId }
                                                 if (currentIndex != -1) {
@@ -552,14 +573,17 @@ fun MainScreen(
                                                     if (diff > 0 && currentIndex < alarms.size - 1) {
                                                         val nextAlarmId = alarms[currentIndex + 1].id
                                                         val nextHeight = itemHeights[nextAlarmId]?.toFloat() ?: 0f
+                                                        // Include spacing in threshold to prevent oscillation
                                                         val fullHeight = nextHeight + spacingPx
-                                                        val threshold = fullHeight * 0.5f
+                                                        val threshold = fullHeight * 0.6f // Slightly higher than 50% for stability
                                                         
                                                         if (nextHeight > 0 && diff > threshold) {
-                                                            alarms = alarms.toMutableList().apply {
-                                                                val temp = this[currentIndex]; this[currentIndex] = this[currentIndex + 1]; this[currentIndex + 1] = temp
+                                                            // Prevent ping-pong: only swap if not recently swapping in opposite direction
+                                                            if (lastSwapDirection != -1 || currentTime - lastSwapTime > 500) {
+                                                                alarms.swap(currentIndex, currentIndex + 1)
+                                                                lastSwapTime = currentTime
+                                                                lastSwapDirection = 1
                                                             }
-                                                            lastSwapTime = currentTime
                                                         }
                                                     }
                                                     // Move Up
@@ -567,13 +591,14 @@ fun MainScreen(
                                                         val prevAlarmId = alarms[currentIndex - 1].id
                                                         val prevHeight = itemHeights[prevAlarmId]?.toFloat() ?: 0f
                                                         val fullHeight = prevHeight + spacingPx
-                                                        val threshold = fullHeight * 0.5f
-    
+                                                        val threshold = fullHeight * 0.6f
+                                                        
                                                         if (prevHeight > 0 && diff < -threshold) {
-                                                             alarms = alarms.toMutableList().apply {
-                                                                val temp = this[currentIndex]; this[currentIndex] = this[currentIndex - 1]; this[currentIndex - 1] = temp
+                                                            if (lastSwapDirection != 1 || currentTime - lastSwapTime > 500) {
+                                                                alarms.swap(currentIndex, currentIndex - 1)
+                                                                lastSwapTime = currentTime
+                                                                lastSwapDirection = -1
                                                             }
-                                                            lastSwapTime = currentTime
                                                         }
                                                     }
                                                 }
@@ -599,15 +624,17 @@ fun MainScreen(
                                         draggedAlarmId = null
                                         totalDragOffsetY = 0f
                                         autoScrollSpeed = 0f
-                                        // dragStartIndices.clear() // Keep for a moment or clear? 
-                                        // Better to clear on start or just let it stay. 
-                                        // If we don't clear, next drag overwrites.
+                                        lastSwapDirection = 0
                                         dragStartIndices.clear()
+                                        
+                                        // SAVE STATE ON DROP - ONLY ONCE
+                                        saveAlarms()
                                     },
                                     onDragCancel = {
                                         draggedAlarmId = null
                                         totalDragOffsetY = 0f
                                         autoScrollSpeed = 0f
+                                        lastSwapDirection = 0
                                         dragStartIndices.clear()
                                     }
                         )
@@ -637,22 +664,27 @@ fun MainScreen(
                                 alarm = alarm,
                                 index = (if (draggedAlarmId != null) dragStartIndices[alarm.id] else null) ?: index,
                                 totalAlarms = alarms.size,
+                                chainState = chainState,
                                 onUpdate = { updated ->
-                                    alarms = alarms.toMutableList().apply { set(index, updated) }
+                                    alarms[index] = updated
+                                    saveAlarms()
                                 },
                                 onSchedule = { delay ->
                                     onScheduleAlarm(delay, index + 1, alarm.name, index, 1, false) 
-                                    alarms = alarms.toMutableList().apply { set(index, alarm.copy(
+                                    alarms[index] = alarm.copy(
                                         isActive = true,
                                         scheduledTime = System.currentTimeMillis() + delay
-                                    )) }
+                                    )
+                                    saveAlarms()
                                 },
                                 isEditable = !isChainActive,
                                 onDelete = {
-                                    alarms = alarms.toMutableList().apply { removeAt(index) }
+                                    alarms.removeAt(index)
+                                    saveAlarms()
                                 },
                                 onClone = {
-                                    alarms = alarms.toMutableList().apply { add(index + 1, alarm.clone()) }
+                                    alarms.add(index + 1, alarm.clone())
+                                    saveAlarms()
                                 }
                             )
                         }
@@ -673,6 +705,7 @@ fun MainScreen(
                         alarm = alarm,
                         index = displayIndex,
                         totalAlarms = alarms.size,
+                        chainState = chainState,
                         onUpdate = {},
                         onSchedule = {},
                         onDelete = {},
@@ -1087,6 +1120,7 @@ fun AlarmItem(
     alarm: Alarm,
     index: Int,
     totalAlarms: Int,
+    chainState: ChainState,
     onUpdate: (Alarm) -> Unit,
     onSchedule: (Long) -> Unit,
     onDelete: () -> Unit,
@@ -1100,115 +1134,53 @@ fun AlarmItem(
     var showSoundPicker by remember { mutableStateOf(false) }
     var showJumpConfirmation by remember { mutableStateOf(false) }
     
+    // Determine effective state from ChainState (Single Source of Truth)
+    val isChainActive = chainState.isChainActive
+    val isRunningInChain = isChainActive && chainState.currentIndex == index
+    
+    val effectiveState: AlarmState
+    val effectiveScheduledTime: Long
+    val effectivePausedRemainingMs: Long
+    
+    if (isRunningInChain) {
+        if (chainState.isAlarmRinging) {
+             effectiveState = AlarmState.EXPIRED
+             effectiveScheduledTime = 0L
+             effectivePausedRemainingMs = 0L
+        } else if (chainState.isPaused) {
+             effectiveState = AlarmState.PAUSED
+             effectiveScheduledTime = 0L
+             effectivePausedRemainingMs = chainState.pausedRemainingTime
+        } else {
+             effectiveState = AlarmState.RUNNING
+             effectiveScheduledTime = chainState.endTime
+             effectivePausedRemainingMs = 0L
+        }
+    } else {
+        effectiveState = AlarmState.RESET
+        effectiveScheduledTime = 0L
+        effectivePausedRemainingMs = 0L
+    }
     
     // Track remaining time for text display
     var remainingTime by remember { mutableIntStateOf(alarm.getTotalSeconds()) }
     
-    // CRITICAL: Unified State Synchronization - Single Source of Truth
-    // This polling loop ensures the UI always reflects ChainManager state
-    
-    // Capture latest alarm state to use inside the polling loop
-    val currentAlarm by rememberUpdatedState(alarm)
-    
-    // TRACK START TIME: We need to know when this alarm started locally
-    // to give the backend time to catch up before we auto-reset
-    var localStartTime by remember { mutableLongStateOf(0L) }
-    
-    LaunchedEffect(alarm.isActive) {
-        if (alarm.isActive) {
-            localStartTime = System.currentTimeMillis()
-        }
-    }
-    
-    LaunchedEffect(index) { 
-        val chainManager = ChainManager(context)
-        while (true) {
-            val activeAlarm = currentAlarm // Access latest state
-            val isChainActive = chainManager.isChainActive()
-            val chainIndex = chainManager.getCurrentIndex()
-            
-            // Allow synchronization if:
-            // 1. Chain is active AND this alarm is the one running
-            // 2. Chain is NOT active (Stop detected) AND this alarm thinks it's running
-            
-            val isRemoteActive = isChainActive && chainIndex == index
-            val isAlarmRinging = chainManager.isAlarmRinging()
-            
-            if (isRemoteActive) {
-                // Remote is Active
-                
-                // CHECK IF RINGING FIRST
-                if (isAlarmRinging) {
-                    if (activeAlarm.state != AlarmState.EXPIRED) {
-                         Log.d("AlarmItem", "SYNC: Alarm RINGING detected -> Setting EXPIRED state")
-                         onUpdate(activeAlarm.copy(
-                             isActive = true,
-                             state = AlarmState.EXPIRED,
-                             scheduledTime = 0L // Done counting
-                         ))
-                    }
-                } else {
-                    // Not ringing, check Pause/Resume
-                    val isRemotePaused = chainManager.isChainPaused()
-                    
-                    if (isRemotePaused && activeAlarm.state != AlarmState.PAUSED) {
-                        val remaining = chainManager.getPausedRemainingTime()
-                        Log.d("AlarmItem", "SYNC: Notification PAUSE detected -> Pausing UI")
-                        onUpdate(activeAlarm.copy(
-                            isActive = false, // Local convention for paused
-                            state = AlarmState.PAUSED,
-                            pausedRemainingMs = remaining
-                        ))
-                    } else if (!isRemotePaused && activeAlarm.state != AlarmState.RUNNING) {
-                        val endTime = chainManager.getEndTime()
-                        Log.d("AlarmItem", "SYNC: Notification RESUME detected -> Resuming UI")
-                        onUpdate(activeAlarm.copy(
-                            isActive = true,
-                            state = AlarmState.RUNNING,
-                            scheduledTime = endTime,
-                            pausedRemainingMs = 0L,
-                            // Update startTime to avoid jumps in progress if logic mistakenly uses it
-                            startTime = System.currentTimeMillis()
-                        ))
-                    }
-                }
-            } else {
-                // Remote is NOT Active (STOPPED or different alarm)
-                // If local state is Running/Paused, we must Reset (Stop detected)
-                
-                // Grace period check
-                val timeSinceStart = System.currentTimeMillis() - localStartTime
-                val inGracePeriod = activeAlarm.isActive && timeSinceStart < 500 // Reduced grace period since Service is fixed
-                
-                if (!inGracePeriod && (activeAlarm.state == AlarmState.RUNNING || activeAlarm.state == AlarmState.PAUSED || activeAlarm.state == AlarmState.EXPIRED)) {
-                    Log.d("AlarmItem", "SYNC: Notification STOP detected -> Resetting UI (grace=${timeSinceStart}ms)")
-                    onUpdate(activeAlarm.copy(
-                        isActive = false,
-                        state = AlarmState.RESET,
-                        scheduledTime = 0L,
-                        pausedRemainingMs = 0L
-                    ))
-                }
-            }
-            
-            delay(250) // Poll 4Hz for snappy response
-        }
-    }
-    
     // Update progress and remaining time in real-time
-    // Loop 1: Text Update (1Hz)
-    LaunchedEffect(alarm.state, alarm.isActive, alarm.scheduledTime, alarm.pausedRemainingMs) {
-        if (alarm.state == AlarmState.RUNNING && alarm.isActive) {
+    LaunchedEffect(effectiveState, effectiveScheduledTime, effectivePausedRemainingMs, alarm.hours, alarm.minutes, alarm.seconds) {
+        if (effectiveState == AlarmState.RUNNING) {
             while (isActive) {
                 // Update text every second
-                val remaining = ((alarm.scheduledTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
+                val remaining = ((effectiveScheduledTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
                 remainingTime = remaining
                 delay(1000)
             }
-        } else if (alarm.state == AlarmState.PAUSED) {
-            remainingTime = (alarm.pausedRemainingMs / 1000).toInt().coerceAtLeast(0)
-        } else if (alarm.state == AlarmState.EXPIRED) {
+        } else if (effectiveState == AlarmState.PAUSED) {
+            remainingTime = (effectivePausedRemainingMs / 1000).toInt().coerceAtLeast(0)
+        } else if (effectiveState == AlarmState.EXPIRED) {
             remainingTime = 0
+        } else {
+            // Reset/Idle
+            remainingTime = alarm.getTotalSeconds()
         }
     }
     
@@ -1254,7 +1226,7 @@ fun AlarmItem(
         )
     }
     
-    val isExpanded = alarm.state != AlarmState.RESET
+    val isExpanded = effectiveState != AlarmState.RESET
     
     Card(
         modifier = modifier
@@ -1503,17 +1475,17 @@ fun AlarmItem(
                     ) {
                         // Progress circle
                         com.medicinereminder.app.ui.TimerCircleView(
-                            scheduledTime = alarm.scheduledTime,
+                            scheduledTime = effectiveScheduledTime,
                             totalDuration = alarm.getTotalSeconds() * 1000L,
-                            isExpired = alarm.state == AlarmState.EXPIRED,
-                            isPaused = alarm.state == AlarmState.PAUSED,
-                            pausedRemainingMs = alarm.pausedRemainingMs,
+                            isExpired = effectiveState == AlarmState.EXPIRED,
+                            isPaused = effectiveState == AlarmState.PAUSED,
+                            pausedRemainingMs = effectivePausedRemainingMs,
                             modifier = Modifier.fillMaxSize().padding(4.dp)
                         )
                         
                         // Time display in center
                         Text(
-                            text = if (alarm.state == AlarmState.RUNNING || alarm.state == AlarmState.PAUSED) {
+                            text = if (effectiveState == AlarmState.RUNNING || effectiveState == AlarmState.PAUSED) {
                                 formatTime(remainingTime)
                             } else {
                                 alarm.getFormattedTime()
@@ -1527,7 +1499,7 @@ fun AlarmItem(
                         // Reset button (inside circle, bottom) - always visible
                         IconButton(
                             onClick = {
-                                if (alarm.state == AlarmState.RUNNING) {
+                                if (effectiveState == AlarmState.RUNNING) {
                                     // If running: reset and restart timer
                                     val delay = alarm.getTotalSeconds() * 1000L
                                     val now = System.currentTimeMillis()
@@ -1550,7 +1522,7 @@ fun AlarmItem(
                                         startTime = now,
                                         pausedRemainingMs = 0L
                                     ))
-                                } else if (alarm.state == AlarmState.PAUSED) {
+                                } else if (effectiveState == AlarmState.PAUSED) {
                                     // If paused: reset timer to original duration but stay paused
                                     val originalDuration = alarm.getTotalSeconds() * 1000L
                                     onUpdate(alarm.copy(
@@ -1593,7 +1565,7 @@ fun AlarmItem(
                         modifier = Modifier.fillMaxHeight().padding(bottom = 12.dp)
                     ) {
                         // +1:00 Button (Only when running)
-                        if (alarm.state == AlarmState.RUNNING) {
+                        if (effectiveState == AlarmState.RUNNING) {
                             TextButton(
                                 onClick = {
                                     // Add 1 minute code
@@ -2176,3 +2148,12 @@ fun formatTime(seconds: Int): String {
            else "${s}s"
 }
 
+
+// Helper extension for swapping items in SnapshotStateList (which implements MutableList)
+fun <T> MutableList<T>.swap(index1: Int, index2: Int) {
+    if (index1 in indices && index2 in indices && index1 != index2) {
+        val tmp = this[index1]
+        this[index1] = this[index2]
+        this[index2] = tmp
+    }
+}
