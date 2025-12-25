@@ -519,7 +519,7 @@ fun MainScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .onGloballyPositioned { listCoordinates = it }
-                    .pointerInput(Unit) {
+                    .pointerInput(isChainActive) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offset ->
                                 if (isChainActive) return@detectDragGesturesAfterLongPress
