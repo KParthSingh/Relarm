@@ -389,8 +389,8 @@ fun MainScreen(
                         FilledTonalButton(
                             onClick = onOpenPermissions,
                             colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.error,
-                                contentColor = MaterialTheme.colorScheme.onError
+                                containerColor = Color(0xFFD32F2F), // Fixed red color
+                                contentColor = Color.White
                             ),
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
