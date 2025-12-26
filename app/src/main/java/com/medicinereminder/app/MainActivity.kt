@@ -1447,8 +1447,6 @@ fun AlarmItem(
                             contentDescription = "Start",
                             modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("START", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             } else {
