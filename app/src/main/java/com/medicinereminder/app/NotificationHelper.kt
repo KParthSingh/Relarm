@@ -176,8 +176,13 @@ object NotificationHelper {
     }
 
     fun buildAlarmNotification(context: Context): android.app.Notification {
+        // Get the alarm name from ChainManager
+        val chainManager = ChainManager(context)
+        val alarmName = chainManager.getServiceAlarmName().ifEmpty { "Alarm" }
+        
         val intent = Intent(context, AlarmRingingActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(AlarmRingingActivity.EXTRA_ALARM_NAME, alarmName)
         }
         
         val pendingIntent = PendingIntent.getActivity(

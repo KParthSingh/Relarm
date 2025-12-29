@@ -1,40 +1,66 @@
 package com.medicinereminder.app
 
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
 import com.medicinereminder.app.ui.theme.MedicineReminderTheme
+import java.text.SimpleDateFormat
+import java.util.*
 
 class AlarmRingingActivity : ComponentActivity() {
+    
+    companion object {
+        const val EXTRA_ALARM_NAME = "extra_alarm_name"
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // ... (window flags code)
+        
+        // Set window flags to show over lock screen and turn screen on
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        }
+        
+        val alarmName = intent.getStringExtra(EXTRA_ALARM_NAME) ?: "Alarm"
         
         setContent {
             MedicineReminderTheme {
                 AlarmRingingScreen(
+                    alarmName = alarmName,
                     onDismiss = {
                         dismissAlarm()
                     }
@@ -66,24 +92,58 @@ class AlarmRingingActivity : ComponentActivity() {
         finish()
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         // Prevent back button from dismissing alarm
     }
 }
 
 @Composable
-fun AlarmRingingScreen(onDismiss: () -> Unit) {
+fun AlarmRingingScreen(
+    alarmName: String,
+    onDismiss: () -> Unit
+) {
+    val view = LocalView.current
+    var swipeOffset by remember { mutableFloatStateOf(0f) }
+    val swipeThreshold = -300f
+    
+    // Pulsing animation for the icon
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+    
+    // Get current time
+    val currentTime = remember {
+        val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+        sdf.format(Date())
+    }
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF6750A4), // Deep Purple
-                        Color(0xFF21005D)  // Darker Purple
-                    )
+            .background(MaterialTheme.colorScheme.surface)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (swipeOffset < swipeThreshold) {
+                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                            onDismiss()
+                        } else {
+                            swipeOffset = 0f
+                        }
+                    },
+                    onVerticalDrag = { _, dragAmount ->
+                        swipeOffset = (swipeOffset + dragAmount).coerceAtMost(0f)
+                    }
                 )
-            ),
+            },
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -91,70 +151,122 @@ fun AlarmRingingScreen(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { translationY = swipeOffset }
                 .padding(32.dp)
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // Icon
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-               Icon(
-                   Icons.Default.Notifications,
-                   contentDescription = null,
-                   tint = Color.White,
-                   modifier = Modifier.size(64.dp)
-               )
-            }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Text
-            Text(
-                text = stringResource(R.string.alarm_ringing),
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = stringResource(R.string.alarm_ringing_subtitle),
-                fontSize = 18.sp,
-                color = Color.White.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // Dismiss Button
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp),
-                shape = RoundedCornerShape(36.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEADDFF),
-                    contentColor = Color(0xFF21005D)
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+            // Top section with time
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(top = 48.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.dismiss_alarm).uppercase(),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    text = currentTime,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Light,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
-            Spacer(modifier = Modifier.height(32.dp))
+            // Center section with icon and alarm info
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.weight(1f)
+            ) {
+                // Pulsing icon
+                Surface(
+                    modifier = Modifier
+                        .size(140.dp)
+                        .scale(scale),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 8.dp
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Alarm,
+                            contentDescription = null,
+                            modifier = Modifier.size(72.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(40.dp))
+                
+                // Alarm title
+                Text(
+                    text = "Alarm Ringing!",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Alarm name
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                ) {
+                    Text(
+                        text = alarmName,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                    )
+                }
+            }
+            
+            // Bottom section with dismiss button and swipe hint
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(bottom = 32.dp)
+            ) {
+                // Dismiss Button
+                Button(
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp),
+                    shape = RoundedCornerShape(36.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 8.dp,
+                        pressedElevation = 12.dp
+                    )
+                ) {
+                    Text(
+                        text = "DISMISS",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Swipe hint
+                Text(
+                    text = "Swipe up to dismiss",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
