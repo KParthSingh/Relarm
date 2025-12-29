@@ -305,6 +305,7 @@ fun MainScreen(
     
     // Check permission states
     val powerManager = remember { context.getSystemService(PowerManager::class.java) }
+    val notificationManager = remember { context.getSystemService(android.app.NotificationManager::class.java) }
     val hasAllPermissions by remember {
         derivedStateOf {
             val batteryOptimized = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -323,10 +324,7 @@ fun MainScreen(
             }
             
             val fullscreen = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.USE_FULL_SCREEN_INTENT
-                ) == PackageManager.PERMISSION_GRANTED
+                notificationManager?.canUseFullScreenIntent() ?: true
             } else {
                 true
             }
