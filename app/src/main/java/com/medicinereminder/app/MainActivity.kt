@@ -355,26 +355,14 @@ fun MainScreen(
     // Observe Alarms Flow (Hybrid approach to support Drag & Drop)
     LaunchedEffect(Unit) {
         repository.getAlarmsFlow().collect { newAlarms ->
-            // Check if content changed: size, IDs, or any alarm properties
-            val sizeChanged = newAlarms.size != alarms.size
-            val idsChanged = newAlarms.map { it.id } != alarms.map { it.id }
-            
-            // Check if any alarm's active state or scheduled time changed
-            val propertiesChanged = if (!sizeChanged && !idsChanged) {
-                newAlarms.indices.any { i ->
-                    val old = alarms.getOrNull(i)
-                    val new = newAlarms.getOrNull(i)
-                    old != null && new != null && (
-                        old.isActive != new.isActive ||
-                        old.scheduledTime != new.scheduledTime ||
-                        old.state != new.state
-                    )
-                }
-            } else false
-            
-            if (sizeChanged || idsChanged || propertiesChanged) {
-                alarms.clear()
-                alarms.addAll(newAlarms)
+            // Only update if content changed remotely AND we are not dragging?
+            // For now, simple diff check. 
+            // Only effective way to check efficiently is if sizes or IDs differ
+            if (newAlarms.size != alarms.size || newAlarms.map { it.id } != alarms.map { it.id }) {
+                 // Make sure we don't clobber local state if it's identical
+                 // (This is a simplified check, proper would be deep equals but expensive)
+                 alarms.clear()
+                 alarms.addAll(newAlarms)
             }
         }
     }
