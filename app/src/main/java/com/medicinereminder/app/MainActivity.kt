@@ -598,7 +598,12 @@ fun MainScreen(
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(spacing),
-                contentPadding = paddingValues,
+                contentPadding = PaddingValues(
+                    top = paddingValues.calculateTopPadding() + 8.dp,
+                    bottom = paddingValues.calculateBottomPadding(),
+                    start = 0.dp,
+                    end = 0.dp
+                ),
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest)
