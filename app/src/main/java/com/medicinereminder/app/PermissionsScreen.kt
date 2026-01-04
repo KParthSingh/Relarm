@@ -144,6 +144,37 @@ fun PermissionsScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
+        },
+        bottomBar = {
+            // Floating Done Button
+            Surface(
+                shadowElevation = 8.dp,
+                tonalElevation = 3.dp
+            ) {
+                Button(
+                    onClick = {
+                        val repository = SettingsRepository(context)
+                        repository.setFirstLaunchComplete(true)
+                        onPermissionsGranted()
+                        onNavigateBack()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text(
+                        text = context.getString(R.string.permissions_done_button),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         Column(
@@ -320,33 +351,6 @@ fun PermissionsScreen(
             }
             
             Spacer(modifier = Modifier.height(24.dp))
-            
-            // Done Button
-            Button(
-                onClick = {
-                    val repository = SettingsRepository(context)
-                    repository.setFirstLaunchComplete(true)
-                    onPermissionsGranted()
-                    onNavigateBack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                Text(
-                    text = context.getString(R.string.permissions_done_button),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -505,6 +509,28 @@ private fun AutostartPermissionItem(
                     text = "I have enabled autostart for this app",
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (isConfirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Status indicator (like other permission items)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (isConfirmed) Icons.Default.CheckCircle else Icons.Outlined.Cancel,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (isConfirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isConfirmed) 
+                        context.getString(R.string.permissions_status_granted)
+                    else 
+                        context.getString(R.string.permissions_status_not_granted),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isConfirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )
             }
         }
