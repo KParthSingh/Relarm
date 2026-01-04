@@ -175,23 +175,19 @@ object NotificationHelper {
         }
     }
 
-    fun buildAlarmNotification(context: Context): android.app.Notification {
-        // Get the alarm info from ChainManager and repository
-        val chainManager = ChainManager(context)
-        val alarmName = chainManager.getServiceAlarmName().ifEmpty { "Alarm" }
-        
-        // Get the actual alarm object to retrieve duration
-        val repository = AlarmRepository(context)
-        val alarms = repository.loadAlarms()
-        val currentIndex = chainManager.getServiceCurrentIndex()
-        val currentAlarm = if (currentIndex < alarms.size) alarms[currentIndex] else null
-        
+    fun buildAlarmNotification(
+        context: Context,
+        alarmName: String = "Alarm",
+        alarmHours: Int = 0,
+        alarmMinutes: Int = 0,
+        alarmSeconds: Int = 5
+    ): android.app.Notification {
         val intent = Intent(context, AlarmRingingActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra(AlarmRingingActivity.EXTRA_ALARM_NAME, alarmName)
-            putExtra(AlarmRingingActivity.EXTRA_ALARM_HOURS, currentAlarm?.hours ?: 0)
-            putExtra(AlarmRingingActivity.EXTRA_ALARM_MINUTES, currentAlarm?.minutes ?: 0)
-            putExtra(AlarmRingingActivity.EXTRA_ALARM_SECONDS, currentAlarm?.seconds ?: 5)
+            putExtra(AlarmRingingActivity.EXTRA_ALARM_HOURS, alarmHours)
+            putExtra(AlarmRingingActivity.EXTRA_ALARM_MINUTES, alarmMinutes)
+            putExtra(AlarmRingingActivity.EXTRA_ALARM_SECONDS, alarmSeconds)
         }
         
         val pendingIntent = PendingIntent.getActivity(

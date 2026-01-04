@@ -38,40 +38,37 @@ class AlarmScheduler(private val context: Context) {
         prefs.edit().putLong("alarm_time_$requestCode", triggerTime).apply()
 
         try {
-            // Use setExactAndAllowWhileIdle for reliable alarms even in Doze mode
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    pendingIntent
-                )
-            }
-            Log.d("AlarmScheduler", "✓ Alarm scheduled successfully (EXACT)")
+            // CRITICAL: Use setAlarmClock for maximum reliability!
+            // This is the MOST reliable way to schedule alarms because:
+            // 1. Shows in system alarm UI (user sees the alarm)
+            // 2. Gets special treatment from Android - survives app kills
+            // 3. Wakes device even from Doze mode
+            // 4. Not affected by battery optimization
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                triggerTime,
+                pendingIntent  // PendingIntent to show when user taps alarm in status bar
+            )
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+            Log.d("AlarmScheduler", "✓ Alarm scheduled successfully (ALARM_CLOCK - MOST RELIABLE)")
             Log.d("AlarmScheduler", "=========================================")
         } catch (e: SecurityException) {
-            Log.e("AlarmScheduler", "✗ Permission denied for exact alarms", e)
-            // CRITICAL FIX #7: Fallback to inexact alarm instead of failing silently
+            Log.e("AlarmScheduler", "✗ Permission denied for setAlarmClock, falling back", e)
+            // Fallback to setExactAndAllowWhileIdle
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setAndAllowWhileIdle(
+                    alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         triggerTime,
                         pendingIntent
                     )
-                    Log.d("AlarmScheduler", "✓ Fallback: Alarm scheduled (INEXACT) - may be delayed")
+                    Log.d("AlarmScheduler", "✓ Fallback: Alarm scheduled (EXACT)")
                 } else {
-                    alarmManager.set(
+                    alarmManager.setExact(
                         AlarmManager.RTC_WAKEUP,
                         triggerTime,
                         pendingIntent
                     )
-                    Log.d("AlarmScheduler", "✓ Fallback: Alarm scheduled (INEXACT) - may be delayed")
+                    Log.d("AlarmScheduler", "✓ Fallback: Alarm scheduled (EXACT - pre-M)")
                 }
             } catch (fallbackException: Exception) {
                 Log.e("AlarmScheduler", "✗ Complete failure - alarm not scheduled!", fallbackException)

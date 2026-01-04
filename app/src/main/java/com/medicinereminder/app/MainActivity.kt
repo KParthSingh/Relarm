@@ -307,6 +307,7 @@ fun MainScreen(
     // Check permission states
     val powerManager = remember { context.getSystemService(PowerManager::class.java) }
     val notificationManager = remember { context.getSystemService(android.app.NotificationManager::class.java) }
+    val settingsRepository = remember { SettingsRepository(context) }
     val hasAllPermissions by remember {
         derivedStateOf {
             val batteryOptimized = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -330,7 +331,10 @@ fun MainScreen(
                 true
             }
             
-            batteryOptimized && notifications && fullscreen
+            // Include autostart confirmation in permission check
+            val autostartConfirmed = settingsRepository.isAutostartConfirmed()
+            
+            batteryOptimized && notifications && fullscreen && autostartConfirmed
         }
     }
     

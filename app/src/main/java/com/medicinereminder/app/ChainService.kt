@@ -59,7 +59,16 @@ class ChainService : Service() {
         chainManager.setCurrentIndex(currentIndex)
         
         // CRITICAL FIX: Save service state for recovery if app is killed
-        chainManager.saveServiceState(currentIndex, endTime, totalAlarms, currentAlarmName)
+        // Load alarm data to save hours/minutes/seconds for background triggering
+        val repository = AlarmRepository(this)
+        val alarms = repository.loadAlarms()
+        val currentAlarm = if (currentIndex < alarms.size) alarms[currentIndex] else null
+        chainManager.saveServiceState(
+            currentIndex, endTime, totalAlarms, currentAlarmName,
+            currentAlarm?.hours ?: 0,
+            currentAlarm?.minutes ?: 0,
+            currentAlarm?.seconds ?: 5
+        )
         
         // CRITICAL FIX #1: Schedule the alarm with AlarmManager!
         // This was missing - alarms were never scheduled!
@@ -73,16 +82,8 @@ class ChainService : Service() {
             DebugLogger.warn("ChainService", "⚠ Cannot schedule alarm - endTime is in the past (remaining: ${remainingMs}ms)")
         }
         
-        DebugLogger.logState("ChainService", mapOf(
-            "action" to "startCountdown",
-            "endTime" to endTime,
-            "currentIndex" to currentIndex,
-            "totalAlarms" to totalAlarms,
-            "alarmName" to currentAlarmName,
-            "isDismissableMode" to isDismissableMode,
-            "notificationDismissed" to notificationDismissed
-        ))
-        Log.d("BatteryOpt", "Timer started - endTime stored: $endTime, hideCounter: $isDismissableMode")
+        // Log concise summary only
+        DebugLogger.info("ChainService", "✓ Countdown: idx=$currentIndex end=$endTime dismiss=$isDismissableMode")
         
         // Start as foreground service with initial notification
         // No loop needed! System Chronometer handles the UI.
@@ -208,16 +209,33 @@ class ChainService : Service() {
         DebugLogger.warn("ChainService", "triggerAlarm() - Setting alarm ringing to TRUE")
         chainManager.setAlarmRinging(true)
         
-        // Get current alarm's sound URI
-        val repository = AlarmRepository(this)
-        val alarms = repository.loadAlarms()
-        val soundUri = if (currentIndex < alarms.size) {
-            alarms[currentIndex].soundUri
-        } else null
+        // CRITICAL FIX: Use already-loaded alarm data from ChainManager instead of disk I/O
+        // When app is swiped from recents, disk I/O can fail or delay.
+        // soundUri is the only thing we need from the actual Alarm object
+        val soundUri: String? = try {
+            val repository = AlarmRepository(this)
+            val alarms = repository.loadAlarms()
+            if (currentIndex < alarms.size) alarms[currentIndex].soundUri else null
+        } catch (e: Exception) {
+            Log.e("ChainService", "Failed to load sound URI, using default", e)
+            null
+        }
         
-        // THIRD: Start alarm sound service (which will create its own ALARM notification)
+        // Get saved alarm details from ChainManager (persisted to SharedPreferences)
+        val savedHours = chainManager.getServiceAlarmHours()
+        val savedMinutes = chainManager.getServiceAlarmMinutes()
+        val savedSeconds = chainManager.getServiceAlarmSeconds()
+        
+        DebugLogger.info("ChainService", "triggerAlarm() - Starting AlarmService with: name=$currentAlarmName, h=$savedHours, m=$savedMinutes, s=$savedSeconds")
+        
+        // Start alarm sound service (which will create its own ALARM notification)
         val serviceIntent = Intent(this, AlarmService::class.java).apply {
             putExtra("soundUri", soundUri)
+            // Pass alarm details so AlarmService doesn't need to read from disk
+            putExtra(AlarmService.EXTRA_ALARM_NAME, currentAlarmName.ifEmpty { "Alarm" })
+            putExtra(AlarmService.EXTRA_ALARM_HOURS, savedHours)
+            putExtra(AlarmService.EXTRA_ALARM_MINUTES, savedMinutes)
+            putExtra(AlarmService.EXTRA_ALARM_SECONDS, savedSeconds)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)
@@ -271,24 +289,13 @@ class ChainService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        DebugLogger.info("ChainService", "========== onStartCommand: ${intent?.action} ==========")
-        DebugLogger.logState("ChainService", mapOf(
-            "action" to (intent?.action ?: "null"),
-            "currentIndex" to currentIndex,
-            "endTime" to endTime,
-            "chainActive" to ChainManager(this).isChainActive(),
-            "chainPaused" to ChainManager(this).isChainPaused(),
-            "isAlarmRinging" to ChainManager(this).isAlarmRinging()
-        ))
-        Log.d("ChainService", "============================================")
-        Log.d("ChainService", "onStartCommand received! Action: ${intent?.action}")
-        Log.d("ChainService", "Current state - Index: $currentIndex, EndTime: $endTime")
-        Log.d("ChainService", "ChainManager state - Active: ${ChainManager(this).isChainActive()}, Paused: ${ChainManager(this).isChainPaused()}")
+        val chainManager = ChainManager(this)
+        val action = intent?.action?.substringAfterLast('.') ?: "null"
+        DebugLogger.info("ChainService", "CMD: $action idx=$currentIndex active=${chainManager.isChainActive()} paused=${chainManager.isChainPaused()} ringing=${chainManager.isAlarmRinging()}")
         
         // CRITICAL FIX: Proactive State Restoration
         // If service is fresh (endTime=0) but ChainManager says we should be running, restore state immediately.
         // This ensures actions like ACTION_PAUSE_CHAIN work even if service was killed and recreated.
-        val chainManager = ChainManager(this)
         if (endTime == 0L && chainManager.isChainActive()) {
              val savedEndTime = chainManager.getServiceEndTime()
              // Only restore if valid. Note: savedEndTime is absolute time.
@@ -453,7 +460,8 @@ class ChainService : Service() {
             }
         }
         Log.d("ChainService", "============================================")
-        return START_NOT_STICKY
+        // CRITICAL: Use START_REDELIVER_INTENT so if service is killed, Android restarts with same intent
+        return START_REDELIVER_INTENT
     }
 
     private fun handlePause() {

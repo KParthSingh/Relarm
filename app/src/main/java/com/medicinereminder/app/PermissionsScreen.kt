@@ -213,6 +213,23 @@ fun PermissionsScreen(
                     
                     HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
                     
+                    // Autostart Permission (2nd - most important for alarm reliability)
+                    val settingsRepository = remember { SettingsRepository(context) }
+                    var autostartConfirmed by remember { mutableStateOf(settingsRepository.isAutostartConfirmed()) }
+                    
+                    AutostartPermissionItem(
+                        isConfirmed = autostartConfirmed,
+                        onOpenSettings = {
+                            AutostartHelper.openAutostartSettings(context)
+                        },
+                        onConfirmChanged = { confirmed ->
+                            autostartConfirmed = confirmed
+                            settingsRepository.setAutostartConfirmed(confirmed)
+                        }
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                    
                     // Fullscreen Notification Permission
                     PermissionItem(
                         icon = Icons.Default.Fullscreen,
@@ -413,6 +430,82 @@ private fun PermissionItem(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutostartPermissionItem(
+    isConfirmed: Boolean,
+    onOpenSettings: () -> Unit,
+    onConfirmChanged: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenSettings)
+            .padding(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Icon - using PlayArrow as RocketLaunch may not be available
+        Icon(
+            imageVector = Icons.Default.Notifications,
+            contentDescription = null,
+            modifier = Modifier
+                .size(40.dp)
+                .padding(end = 16.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        // Content
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Autostart / Background Run",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = "Allow app to start automatically and run in background. Required for alarms to work when app is closed.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Open Settings button
+            OutlinedButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Open Autostart Settings")
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Manual confirmation checkbox
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onConfirmChanged(!isConfirmed) }
+            ) {
+                Checkbox(
+                    checked = isConfirmed,
+                    onCheckedChange = onConfirmChanged
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "I have enabled autostart for this app",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isConfirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

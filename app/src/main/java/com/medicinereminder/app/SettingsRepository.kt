@@ -83,4 +83,14 @@ class SettingsRepository(context: Context) {
     fun setFirstLaunchComplete(completed: Boolean) {
         prefs.edit().putBoolean(KEY_FIRST_LAUNCH_COMPLETE, completed).apply()
     }
+    
+    // Autostart - user manually confirms they've enabled it
+    // (Android doesn't provide an API to check autostart status)
+    fun isAutostartConfirmed(): Boolean {
+        return prefs.getBoolean("autostart_confirmed", false)
+    }
+    
+    fun setAutostartConfirmed(confirmed: Boolean) {
+        prefs.edit().putBoolean("autostart_confirmed", confirmed).apply()
+    }
 }

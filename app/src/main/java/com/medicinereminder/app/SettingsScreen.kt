@@ -291,20 +291,6 @@ fun SettingsScreen(
                 tonalElevation = 1.dp
             ) {
                 Column {
-                    var forceBatteryWarning by remember { mutableStateOf(repository.getForceBatteryWarning()) }
-                    
-                    SettingsSwitchItem(
-                        title = "Force Battery Warning",
-                        subtitle = "Show battery optimization warning on any device (for testing)",
-                        checked = forceBatteryWarning,
-                        onCheckedChange = { enabled ->
-                            forceBatteryWarning = enabled
-                            repository.setForceBatteryWarning(enabled)
-                        }
-                    )
-                    
-                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
-                    
                     // Export Debug Logs
                     SettingsClickableItem(
                         title = "Export Debug Logs",
@@ -360,6 +346,47 @@ fun SettingsScreen(
                             dismissButton = {
                                 TextButton(onClick = { showClearLogsDialog = false }) {
                                     Text("Cancel")
+                                }
+                            }
+                        )
+                    }
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                    
+                    // Test Background Alarm - diagnose if alarms survive recents swipe
+                    var showTestDialog by remember { mutableStateOf(false) }
+                    var testStatus by remember { mutableStateOf("") }
+                    
+                    SettingsClickableItem(
+                        title = "Test Background Alarm (5 sec)",
+                        subtitle = "Schedule a test alarm then swipe app from recents to test",
+                        onClick = { 
+                            val alarmScheduler = AlarmScheduler(context)
+                            val testDelay = 5000L  // 5 seconds
+                            alarmScheduler.scheduleAlarm(testDelay, 9999)  // Use unique request code
+                            testStatus = "Test alarm scheduled for ${java.text.SimpleDateFormat("h:mm:ss a", java.util.Locale.getDefault()).format(java.util.Date(System.currentTimeMillis() + testDelay))}\n\nNow swipe app from recents and wait 5+ seconds."
+                            showTestDialog = true
+                            DebugLogger.warn("AlarmTest", "TEST: Scheduled background alarm (5 sec)")
+                        }
+                    )
+                    
+                    if (showTestDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showTestDialog = false },
+                            title = { Text("Background Alarm Test") },
+                            text = { Text(testStatus) },
+                            confirmButton = {
+                                Button(onClick = { showTestDialog = false }) {
+                                    Text("OK")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { 
+                                    // Cancel the test alarm
+                                    AlarmScheduler(context).cancelAlarm(9999)
+                                    showTestDialog = false
+                                }) {
+                                    Text("Cancel Test")
                                 }
                             }
                         )
