@@ -15,12 +15,6 @@ import android.util.Log
 class AlarmService : Service() {
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
-    
-    // Store alarm info for notification rebuilding
-    private var alarmName: String = "Alarm"
-    private var alarmHours: Int = 0
-    private var alarmMinutes: Int = 0
-    private var alarmSeconds: Int = 5
 
     override fun onCreate() {
         super.onCreate()
@@ -29,8 +23,7 @@ class AlarmService : Service() {
         // Create notification channel
         NotificationHelper.createNotificationChannel(this)
         
-        // Start as foreground service with ALARM notification (using defaults initially)
-        // The actual alarm info will be set in onStartCommand
+        // Start as foreground service with ALARM notification
         val notification = NotificationHelper.buildAlarmNotification(this)
         startForeground(NotificationHelper.NOTIFICATION_ID, notification)
     }
@@ -41,30 +34,13 @@ class AlarmService : Service() {
         // Handle restore notification if user tries to swipe it away
         if (intent?.action == "RESTORE_NOTIFICATION") {
             Log.d("AlarmService", "Restoring notification after swipe attempt")
-            val notification = NotificationHelper.buildAlarmNotification(
-                this, alarmName, alarmHours, alarmMinutes, alarmSeconds
-            )
+            val notification = NotificationHelper.buildAlarmNotification(this)
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
             notificationManager.notify(NotificationHelper.NOTIFICATION_ID, notification)
         } else {
-            // Extract alarm info from intent extras
-            intent?.let {
-                alarmName = it.getStringExtra(EXTRA_ALARM_NAME) ?: "Alarm"
-                alarmHours = it.getIntExtra(EXTRA_ALARM_HOURS, 0)
-                alarmMinutes = it.getIntExtra(EXTRA_ALARM_MINUTES, 0)
-                alarmSeconds = it.getIntExtra(EXTRA_ALARM_SECONDS, 5)
-            }
-            
-            // Update notification with correct alarm info
-            val notification = NotificationHelper.buildAlarmNotification(
-                this, alarmName, alarmHours, alarmMinutes, alarmSeconds
-            )
-            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
-            notificationManager.notify(NotificationHelper.NOTIFICATION_ID, notification)
-            
             // Get custom sound URI if provided
             val soundUri = intent?.getStringExtra("soundUri")
-            Log.d("AlarmService", "Starting with sound URI: $soundUri, alarm: $alarmName")
+            Log.d("AlarmService", "Starting with sound URI: $soundUri")
             
             // Start playing alarm sound
             playAlarmSound(soundUri)
@@ -192,11 +168,4 @@ class AlarmService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-    
-    companion object {
-        const val EXTRA_ALARM_NAME = "extra_alarm_name"
-        const val EXTRA_ALARM_HOURS = "extra_alarm_hours"
-        const val EXTRA_ALARM_MINUTES = "extra_alarm_minutes"
-        const val EXTRA_ALARM_SECONDS = "extra_alarm_seconds"
-    }
 }

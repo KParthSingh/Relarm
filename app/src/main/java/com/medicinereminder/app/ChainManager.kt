@@ -23,9 +23,6 @@ class ChainManager(private val context: Context) {
         private const val KEY_SERVICE_END_TIME = "service_end_time"
         private const val KEY_SERVICE_TOTAL_ALARMS = "service_total_alarms"
         private const val KEY_SERVICE_ALARM_NAME = "service_alarm_name"
-        private const val KEY_SERVICE_ALARM_HOURS = "service_alarm_hours"
-        private const val KEY_SERVICE_ALARM_MINUTES = "service_alarm_minutes"
-        private const val KEY_SERVICE_ALARM_SECONDS = "service_alarm_seconds"
         private const val KEY_IS_CHAIN_SEQUENCE = "is_chain_sequence"
     }
     
@@ -202,16 +199,13 @@ class ChainManager(private val context: Context) {
     }
     
     // ChainService state persistence for recovery
-    fun saveServiceState(currentIndex: Int, endTime: Long, totalAlarms: Int, alarmName: String, hours: Int = 0, minutes: Int = 0, seconds: Int = 0) {
-        DebugLogger.info("ChainManager", "saveServiceState: index=$currentIndex, endTime=$endTime, total=$totalAlarms, h=$hours m=$minutes s=$seconds")
+    fun saveServiceState(currentIndex: Int, endTime: Long, totalAlarms: Int, alarmName: String) {
+        DebugLogger.info("ChainManager", "saveServiceState: index=$currentIndex, endTime=$endTime, total=$totalAlarms")
         prefs.edit()
             .putInt(KEY_SERVICE_CURRENT_INDEX, currentIndex)
             .putLong(KEY_SERVICE_END_TIME, endTime)
             .putInt(KEY_SERVICE_TOTAL_ALARMS, totalAlarms)
             .putString(KEY_SERVICE_ALARM_NAME, alarmName)
-            .putInt(KEY_SERVICE_ALARM_HOURS, hours)
-            .putInt(KEY_SERVICE_ALARM_MINUTES, minutes)
-            .putInt(KEY_SERVICE_ALARM_SECONDS, seconds)
             .apply()
     }
     
@@ -229,18 +223,6 @@ class ChainManager(private val context: Context) {
     
     fun getServiceAlarmName(): String {
         return prefs.getString(KEY_SERVICE_ALARM_NAME, "") ?: ""
-    }
-    
-    fun getServiceAlarmHours(): Int {
-        return prefs.getInt(KEY_SERVICE_ALARM_HOURS, 0)
-    }
-    
-    fun getServiceAlarmMinutes(): Int {
-        return prefs.getInt(KEY_SERVICE_ALARM_MINUTES, 0)
-    }
-    
-    fun getServiceAlarmSeconds(): Int {
-        return prefs.getInt(KEY_SERVICE_ALARM_SECONDS, 5)  // Default to 5 seconds
     }
 
     fun getChainState(): ChainState {
