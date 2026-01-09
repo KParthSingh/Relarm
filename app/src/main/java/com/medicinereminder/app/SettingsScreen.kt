@@ -16,6 +16,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.medicinereminder.app.ui.SimpleDurationPicker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -74,6 +74,9 @@ dependencies {
     // Gson for JSON serialization
     implementation("com.google.code.gson:gson:2.10.1")
     
+    // Snapper for wheel picker fling behavior
+    implementation("dev.chrisbanes.snapper:snapper:0.3.0")
+    
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

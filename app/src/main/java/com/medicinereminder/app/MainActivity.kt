@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import com.medicinereminder.app.ui.theme.MedicineReminderTheme
+import com.medicinereminder.app.ui.SimpleDurationPicker
 import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Date
