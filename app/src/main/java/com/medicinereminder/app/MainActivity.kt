@@ -356,6 +356,10 @@ fun MainScreen(
     val currentChainIndex = chainState.currentIndex
     val isAlarmRinging = chainState.isAlarmRinging
     val isChainSequence = chainState.isChainSequence
+    
+    // Unified alarm dialog state
+    var showUnifiedDialog by remember { mutableStateOf(false) }
+    var editingAlarmIndex by remember { mutableIntStateOf(-1) }  // -1 for new alarm
 
     // Observe Alarms Flow (Hybrid approach to support Drag & Drop)
     LaunchedEffect(Unit) {
@@ -428,15 +432,10 @@ fun MainScreen(
         },
         floatingActionButton = {
             if (!isChainActive) {
-                val settingsRepository = remember { SettingsRepository(context) }
                 ExtendedFloatingActionButton(
                     onClick = { 
-                        val defaultSeconds = settingsRepository.getDefaultAlarmTime()
-                        val h = defaultSeconds / 3600
-                        val m = (defaultSeconds % 3600) / 60
-                        val s = defaultSeconds % 60
-                        alarms.add(Alarm(hours = h, minutes = m, seconds = s))
-                        saveAlarms() // Save on add
+                        editingAlarmIndex = -1  // -1 means new alarm
+                        showUnifiedDialog = true
                     },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -775,6 +774,10 @@ fun MainScreen(
                                 onClone = {
                                     alarms.add(index + 1, alarm.clone())
                                     saveAlarms()
+                                },
+                                onOpenUnifiedDialog = {
+                                    editingAlarmIndex = index
+                                    showUnifiedDialog = true
                                 }
                             )
                         }
@@ -800,6 +803,7 @@ fun MainScreen(
                         onSchedule = {},
                         onDelete = {},
                         onClone = {},
+                        onOpenUnifiedDialog = {},
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 10.dp)
@@ -816,6 +820,29 @@ fun MainScreen(
                 }
             }
         }
+    }
+    
+    // Unified Alarm Dialog
+    if (showUnifiedDialog) {
+        val alarmToEdit = if (editingAlarmIndex >= 0 && editingAlarmIndex < alarms.size) alarms[editingAlarmIndex] else null
+        UnifiedAlarmDialog(
+            alarm = alarmToEdit,
+            defaultDurationSeconds = settingsRepository.getDefaultAlarmTime(),
+            onDismiss = { 
+                showUnifiedDialog = false
+                editingAlarmIndex = -1 
+            },
+            onConfirm = { newAlarm ->
+                if (editingAlarmIndex >= 0 && editingAlarmIndex < alarms.size) {
+                    alarms[editingAlarmIndex] = newAlarm
+                } else {
+                    alarms.add(newAlarm)
+                }
+                saveAlarms()
+                showUnifiedDialog = false
+                editingAlarmIndex = -1
+            }
+        )
     }
 }
 
@@ -1091,12 +1118,10 @@ fun AlarmItem(
     onDelete: () -> Unit,
     isEditable: Boolean = true,
     modifier: Modifier = Modifier,
-    onClone: () -> Unit
+    onClone: () -> Unit,
+    onOpenUnifiedDialog: () -> Unit
 ) {
     val context = LocalContext.current
-    var showNameDialog by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
-    var showSoundPicker by remember { mutableStateOf(false) }
     var showJumpConfirmation by remember { mutableStateOf(false) }
     
     // Determine effective state from ChainState (Single Source of Truth)
@@ -1220,7 +1245,7 @@ fun AlarmItem(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable(enabled = isEditable) { showNameDialog = true }
+                        .clickable(enabled = isEditable) { onOpenUnifiedDialog() }
                         .padding(6.dp)
                 ) {
                     if (isEditable) {
@@ -1361,7 +1386,7 @@ fun AlarmItem(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable(enabled = isEditable) { showTimePicker = true }
+                            .clickable(enabled = isEditable) { onOpenUnifiedDialog() }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Icon(
@@ -1452,7 +1477,7 @@ fun AlarmItem(
                             style = MaterialTheme.typography.displayMedium.copy(fontSize = 40.sp),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.clickable(enabled = isEditable) { showTimePicker = true }
+                            modifier = Modifier.clickable(enabled = isEditable) { onOpenUnifiedDialog() }
                         )
                         
                         // Reset button (inside circle, bottom) - always visible
@@ -1685,115 +1710,6 @@ fun AlarmItem(
             }
             
 
-        }
-    }
-    
-    // Name edit dialog
-    if (showNameDialog) {
-        var tempName by remember { mutableStateOf(alarm.name) }
-        AlertDialog(
-            onDismissRequest = { showNameDialog = false },
-            title = { Text("Edit Alarm Name") },
-            text = {
-                OutlinedTextField(
-                    value = tempName,
-                    onValueChange = { tempName = it },
-                    label = { Text("Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onUpdate(alarm.copy(name = tempName))
-                        showNameDialog = false
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNameDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-    
-    // Duration picker (reuse existing bottom sheet)
-    if (showTimePicker) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { showTimePicker = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    "Set Duration",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
-
-                SimpleDurationPicker(
-                    hours = alarm.hours,
-                    minutes = alarm.minutes,
-                    seconds = alarm.seconds,
-                    onTimeChange = { h, m, s ->
-                        onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false, state = AlarmState.RESET))
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Quick Add
-                Text(
-                    "Quick Add", 
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(), 
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    listOf(5, 10, 30, 60).forEach { sec ->
-                        OutlinedButton(
-                            onClick = {
-                                val currentTotal = alarm.getTotalSeconds()
-                                val newTotal = currentTotal + sec
-                                val h = newTotal / 3600
-                                val m = (newTotal % 3600) / 60
-                                val s = newTotal % 60
-                                onUpdate(alarm.copy(hours = h, minutes = m, seconds = s, isActive = false, state = AlarmState.RESET))
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
-                        ) {
-                            Text("+${if (sec < 60) "${sec}s" else "${sec/60}m"}", fontSize = 12.sp)
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
-                Button(
-                    onClick = { showTimePicker = false },
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) {
-                    Text("Done")
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
         }
     }
 }
@@ -2107,6 +2023,160 @@ fun formatTime(seconds: Int): String {
            else "${s}s"
 }
 
+/**
+ * Unified Alarm Dialog
+ * Combines alarm name input, duration picker, and sound selection into a single dialog.
+ * Used for both creating new alarms and editing existing ones.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UnifiedAlarmDialog(
+    alarm: Alarm?,  // null for new alarm, existing alarm for edit
+    defaultDurationSeconds: Int,  // from settings, for new alarms
+    onDismiss: () -> Unit,
+    onConfirm: (Alarm) -> Unit,  // returns new or updated alarm
+) {
+    val context = LocalContext.current
+    
+    // Initialize state from existing alarm or defaults
+    val initialHours = alarm?.hours ?: (defaultDurationSeconds / 3600)
+    val initialMinutes = alarm?.minutes ?: ((defaultDurationSeconds % 3600) / 60)
+    val initialSeconds = alarm?.seconds ?: (defaultDurationSeconds % 60)
+    
+    var name by remember { mutableStateOf(alarm?.name ?: "") }
+    var hours by remember { mutableIntStateOf(initialHours) }
+    var minutes by remember { mutableIntStateOf(initialMinutes) }
+    var seconds by remember { mutableIntStateOf(initialSeconds) }
+    var soundUri by remember { mutableStateOf(alarm?.soundUri) }
+    
+    // Sound picker launcher
+    val soundPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            soundUri = uri?.toString()
+        }
+    }
+    
+    // Get sound name for display
+    val soundName = remember(soundUri) {
+        if (soundUri == null) {
+            "Default Alarm Sound"
+        } else {
+            try {
+                val ringtone = RingtoneManager.getRingtone(context, Uri.parse(soundUri))
+                ringtone.getTitle(context)
+            } catch (e: Exception) {
+                "Custom Sound"
+            }
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Text(
+                text = if (alarm == null) "Add Alarm" else "Edit Alarm",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Name input with sound icon button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Alarm Name (Optional)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    // Sound selection icon button
+                    IconButton(
+                        onClick = {
+                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
+                                soundUri?.let { uri ->
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(uri))
+                                }
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                            }
+                            soundPickerLauncher.launch(intent)
+                        }
+                    ) {
+                        Icon(
+                            Icons.Outlined.MusicNote,
+                            contentDescription = "Select Sound",
+                            tint = if (soundUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Duration picker (no label)
+                SimpleDurationPicker(
+                    hours = hours,
+                    minutes = minutes,
+                    seconds = seconds,
+                    onTimeChange = { h, m, s ->
+                        hours = h
+                        minutes = m
+                        seconds = s
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val resultAlarm = if (alarm != null) {
+                        // Editing existing alarm
+                        alarm.copy(
+                            name = name,
+                            hours = hours,
+                            minutes = minutes,
+                            seconds = seconds,
+                            soundUri = soundUri,
+                            isActive = false,
+                            state = AlarmState.RESET
+                        )
+                    } else {
+                        // Creating new alarm
+                        Alarm(
+                            name = name,
+                            hours = hours,
+                            minutes = minutes,
+                            seconds = seconds,
+                            soundUri = soundUri
+                        )
+                    }
+                    onConfirm(resultAlarm)
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 
 // Helper extension for swapping items in SnapshotStateList (which implements MutableList)
 fun <T> MutableList<T>.swap(index1: Int, index2: Int) {
@@ -2116,3 +2186,4 @@ fun <T> MutableList<T>.swap(index1: Int, index2: Int) {
         this[index2] = tmp
     }
 }
+
