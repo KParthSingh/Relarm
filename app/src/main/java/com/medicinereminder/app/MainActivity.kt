@@ -84,6 +84,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.isActive
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 // Navigation screens
 enum class Screen { Main, Settings, Permissions }
@@ -309,7 +312,24 @@ fun MainScreen(
     val powerManager = remember { context.getSystemService(PowerManager::class.java) }
     val notificationManager = remember { context.getSystemService(android.app.NotificationManager::class.java) }
     val settingsRepository = remember { SettingsRepository(context) }
-    val hasAllPermissions by remember {
+    
+    // Lifecycle-aware permission refresh
+    var permissionRefreshTrigger by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                permissionRefreshTrigger++  // Trigger recomposition when app resumes
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    
+    // Permission states that refresh on lifecycle changes
+    val hasAllPermissions by remember(permissionRefreshTrigger) {
         derivedStateOf {
             val batteryOptimized = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: true
@@ -360,6 +380,23 @@ fun MainScreen(
     // Unified alarm dialog state
     var showUnifiedDialog by remember { mutableStateOf(false) }
     var editingAlarmIndex by remember { mutableIntStateOf(-1) }  // -1 for new alarm
+    
+    // Fullscreen notification permission dialog (also refreshes on lifecycle)
+    val hasFullscreenPermission = remember(permissionRefreshTrigger) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            notificationManager?.canUseFullScreenIntent() ?: true
+        } else {
+            true
+        }
+    }
+    var showFullscreenPermissionDialog by remember { mutableStateOf(!hasFullscreenPermission) }
+    
+    // Auto-dismiss fullscreen dialog when permission is granted
+    LaunchedEffect(hasFullscreenPermission) {
+        if (hasFullscreenPermission) {
+            showFullscreenPermissionDialog = false
+        }
+    }
 
     // Observe Alarms Flow (Hybrid approach to support Drag & Drop)
     LaunchedEffect(Unit) {
@@ -841,6 +878,52 @@ fun MainScreen(
                 saveAlarms()
                 showUnifiedDialog = false
                 editingAlarmIndex = -1
+            }
+        )
+    }
+    
+    // Fullscreen Notification Permission Dialog
+    if (showFullscreenPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showFullscreenPermissionDialog = false },
+            icon = {
+                Icon(
+                    Icons.Outlined.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = { 
+                Text(
+                    "Full Screen Notifications Disabled",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = { 
+                Text(
+                    "Full screen notifications are required for alarms to display properly when your phone is locked. Please enable this permission for the best experience."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showFullscreenPermissionDialog = false
+                        // Open app's full screen notification settings
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                            val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(intent)
+                        }
+                    }
+                ) {
+                    Text("Open Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFullscreenPermissionDialog = false }) {
+                    Text("Dismiss")
+                }
             }
         )
     }
