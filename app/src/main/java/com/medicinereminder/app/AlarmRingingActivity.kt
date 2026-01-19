@@ -63,8 +63,11 @@ class AlarmRingingActivity : ComponentActivity() {
         val alarmMinutes = intent.getIntExtra(EXTRA_ALARM_MINUTES, 0)
         val alarmSeconds = intent.getIntExtra(EXTRA_ALARM_SECONDS, 5)
         
+        val settingsRepository = SettingsRepository(this)
+        val themeMode = settingsRepository.getThemeMode()
+
         setContent {
-            MedicineReminderTheme {
+            MedicineReminderTheme(themeMode = themeMode) {
                 AlarmRingingScreen(
                     alarmName = alarmName,
                     alarmHours = alarmHours,

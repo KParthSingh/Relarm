@@ -3,5 +3,6 @@
     <style name="Theme.MedicineReminder" parent="android:Theme.Material.Light.NoActionBar">
         <!-- Splash Screen Background for Light Mode -->
         <item name="android:windowSplashScreenBackground">#FEFBFF</item>
+        <item name="android:windowBackground">#FEFBFF</item>
     </style>
 </resources>
