@@ -23,6 +23,7 @@ object DebugLogger {
     private const val MAX_LOG_FILES = 3
     
     private var logFile: File? = null
+    private var isEnabled: Boolean = false
     private val mutex = Mutex()
     private val scope = CoroutineScope(Dispatchers.IO)
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
@@ -35,14 +36,31 @@ object DebugLogger {
     }
     
     fun init(context: Context) {
+        val repo = SettingsRepository(context)
+        isEnabled = repo.getEnableDebugLogs()
+        if (!isEnabled) {
+             // Even if disabled, we initialize the file reference but don't log start
+             logFile = File(context.cacheDir, LOG_FILENAME)
+             return
+        }
+        
         logFile = File(context.cacheDir, LOG_FILENAME)
         log(Level.INFO, "DebugLogger", "=== Logger Initialized ===")
+    }
+    
+    fun setEnabled(enabled: Boolean) {
+        isEnabled = enabled
+        if (enabled) {
+            log(Level.INFO, "DebugLogger", "=== Logger Enabled ===")
+        }
     }
     
     /**
      * Log a message asynchronously to avoid blocking the caller.
      */
     fun log(level: Level, component: String, message: String) {
+        if (!isEnabled) return
+        
         scope.launch {
             try {
                 mutex.withLock {
@@ -77,7 +95,10 @@ object DebugLogger {
      */
     fun info(component: String, message: String) = log(Level.INFO, component, message)
     fun warn(component: String, message: String) = log(Level.WARNING, component, message)
-    fun error(component: String, message: String) = log(Level.ERROR, component, message)
+    fun error(component: String, message: String, t: Throwable? = null) {
+        val msg = if (t != null) "$message\n${t.stackTraceToString()}" else message
+        log(Level.ERROR, component, msg)
+    }
     fun state(component: String, message: String) = log(Level.STATE, component, message)
     
     /**

@@ -42,7 +42,7 @@ class AlarmStopReceiver : BroadcastReceiver() {
                  context.startService(nextIntent)
             }
             
-            Log.d("AlarmStopReceiver", "Alarm stopped and ACTION_NEXT_ALARM sent")
+            DebugLogger.info("AlarmStopReceiver", "Alarm stopped and ACTION_NEXT_ALARM sent")
         }
     }
 }

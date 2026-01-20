@@ -22,7 +22,7 @@ object AutostartHelper {
         val manufacturer = Build.MANUFACTURER.lowercase()
         val brand = Build.BRAND.lowercase()
         
-        Log.d(TAG, "Opening autostart settings for manufacturer: $manufacturer, brand: $brand")
+        DebugLogger.info(TAG, "Opening autostart settings for manufacturer: $manufacturer, brand: $brand")
         
         var success = false
         
@@ -51,7 +51,7 @@ object AutostartHelper {
         
         // Fallback to general battery optimization settings
         if (!success) {
-            Log.d(TAG, "Manufacturer-specific intent failed, falling back to battery settings")
+            DebugLogger.info(TAG, "Manufacturer-specific intent failed, falling back to battery settings")
             openBatteryOptimizationSettings(context)
         }
     }
@@ -66,10 +66,10 @@ object AutostartHelper {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-            Log.d(TAG, "Opened Xiaomi autostart settings")
+            DebugLogger.info(TAG, "Opened Xiaomi autostart settings")
             true
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to open Xiaomi autostart settings: ${e.message}")
+            DebugLogger.warn(TAG, "Failed to open Xiaomi autostart settings: ${e.message}")
             false
         }
     }
@@ -84,10 +84,10 @@ object AutostartHelper {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-            Log.d(TAG, "Opened Oppo autostart settings")
+            DebugLogger.info(TAG, "Opened Oppo autostart settings")
             true
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to open Oppo autostart settings, trying alternate: ${e.message}")
+            DebugLogger.warn(TAG, "Failed to open Oppo autostart settings, trying alternate: ${e.message}")
             // Try alternate Oppo intent
             try {
                 val altIntent = Intent().apply {
@@ -98,10 +98,10 @@ object AutostartHelper {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(altIntent)
-                Log.d(TAG, "Opened Oppo autostart settings (alternate)")
+                DebugLogger.info(TAG, "Opened Oppo autostart settings (alternate)")
                 true
             } catch (e2: Exception) {
-                Log.w(TAG, "Failed to open Oppo autostart settings (alternate): ${e2.message}")
+                DebugLogger.warn(TAG, "Failed to open Oppo autostart settings (alternate): ${e2.message}")
                 false
             }
         }
@@ -117,10 +117,10 @@ object AutostartHelper {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-            Log.d(TAG, "Opened Vivo autostart settings")
+            DebugLogger.info(TAG, "Opened Vivo autostart settings")
             true
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to open Vivo autostart settings: ${e.message}")
+            DebugLogger.warn(TAG, "Failed to open Vivo autostart settings: ${e.message}")
             false
         }
     }
@@ -135,10 +135,10 @@ object AutostartHelper {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-            Log.d(TAG, "Opened Huawei autostart settings")
+            DebugLogger.info(TAG, "Opened Huawei autostart settings")
             true
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to open Huawei autostart settings: ${e.message}")
+            DebugLogger.warn(TAG, "Failed to open Huawei autostart settings: ${e.message}")
             false
         }
     }
@@ -153,10 +153,10 @@ object AutostartHelper {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-            Log.d(TAG, "Opened OnePlus autostart settings")
+            DebugLogger.info(TAG, "Opened OnePlus autostart settings")
             true
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to open OnePlus autostart settings: ${e.message}")
+            DebugLogger.warn(TAG, "Failed to open OnePlus autostart settings: ${e.message}")
             false
         }
     }
@@ -167,9 +167,9 @@ object AutostartHelper {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-            Log.d(TAG, "Opened general battery optimization settings")
+            DebugLogger.info(TAG, "Opened general battery optimization settings")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to open battery optimization settings: ${e.message}")
+            DebugLogger.error(TAG, "Failed to open battery optimization settings: ${e.message}")
             // Last resort: open app settings
             try {
                 val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -177,9 +177,9 @@ object AutostartHelper {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(settingsIntent)
-                Log.d(TAG, "Opened app settings as fallback")
+                DebugLogger.info(TAG, "Opened app settings as fallback")
             } catch (e2: Exception) {
-                Log.e(TAG, "Failed to open any settings: ${e2.message}")
+                DebugLogger.error(TAG, "Failed to open any settings: ${e2.message}")
             }
         }
     }

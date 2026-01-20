@@ -82,7 +82,7 @@ class ChainService : Service() {
             "isDismissableMode" to isDismissableMode,
             "notificationDismissed" to notificationDismissed
         ))
-        Log.d("BatteryOpt", "Timer started - endTime stored: $endTime, hideCounter: $isDismissableMode")
+        DebugLogger.info("BatteryOpt", "Timer started - endTime stored: $endTime, hideCounter: $isDismissableMode")
         
         // Start as foreground service with initial notification
         // No loop needed! System Chronometer handles the UI.
@@ -155,7 +155,7 @@ class ChainService : Service() {
                 startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            Log.e("ChainService", "Error starting foreground", e)
+            DebugLogger.error("ChainService", "Error starting foreground", e)
         }
         
         // If in dismissable mode, immediately stop foreground to hide notification
@@ -166,7 +166,7 @@ class ChainService : Service() {
                 @Suppress("DEPRECATION")
                 stopForeground(true)
             }
-            Log.d("BatteryOpt", "Notification hidden (dismissable mode ON)")
+            DebugLogger.info("BatteryOpt", "Notification hidden (dismissable mode ON)")
         }
     }
     
@@ -174,13 +174,13 @@ class ChainService : Service() {
         // CRITICAL: Prevent double triggering (AlarmManager + countdown loop could both call this)
         synchronized(this) {
             if (isAlarmTriggering) {
-                Log.w("ChainService", "triggerAlarm() already in progress - skipping duplicate call")
+                DebugLogger.warn("ChainService", "triggerAlarm() already in progress - skipping duplicate call")
                 return
             }
             isAlarmTriggering = true
         }
         
-        Log.d("ChainService", "triggerAlarm() - Exiting foreground mode")
+        DebugLogger.info("ChainService", "triggerAlarm() - Exiting foreground mode")
         
         // FIRST: No loop to cancel anymore
         // countdownJob?.cancel()
@@ -198,7 +198,7 @@ class ChainService : Service() {
         // THIRD: Check if we're in a chain
         val chainManager = ChainManager(this)
         if (!chainManager.isChainActive()) {
-            Log.w("ChainService", "Chain not active in triggerAlarm, stopping service")
+            DebugLogger.warn("ChainService", "Chain not active in triggerAlarm, stopping service")
             // Reset flag before returning
             isAlarmTriggering = false
             return
@@ -245,7 +245,7 @@ class ChainService : Service() {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
         
-        Log.d("ChainService", "Chain service destroyed")
+        DebugLogger.info("ChainService", "Chain service destroyed")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -280,10 +280,10 @@ class ChainService : Service() {
             "chainPaused" to ChainManager(this).isChainPaused(),
             "isAlarmRinging" to ChainManager(this).isAlarmRinging()
         ))
-        Log.d("ChainService", "============================================")
-        Log.d("ChainService", "onStartCommand received! Action: ${intent?.action}")
-        Log.d("ChainService", "Current state - Index: $currentIndex, EndTime: $endTime")
-        Log.d("ChainService", "ChainManager state - Active: ${ChainManager(this).isChainActive()}, Paused: ${ChainManager(this).isChainPaused()}")
+        DebugLogger.info("ChainService", "============================================")
+        DebugLogger.info("ChainService", "onStartCommand received! Action: ${intent?.action}")
+        DebugLogger.info("ChainService", "Current state - Index: $currentIndex, EndTime: $endTime")
+        DebugLogger.info("ChainService", "ChainManager state - Active: ${ChainManager(this).isChainActive()}, Paused: ${ChainManager(this).isChainPaused()}")
         
         // CRITICAL FIX: Proactive State Restoration
         // If service is fresh (endTime=0) but ChainManager says we should be running, restore state immediately.
@@ -303,7 +303,7 @@ class ChainService : Service() {
 
         when (intent?.action) {
             ACTION_START_CHAIN_ALARM -> {
-                Log.d("ChainService", ">>> ACTION_START_CHAIN_ALARM received")
+                DebugLogger.info("ChainService", ">>> ACTION_START_CHAIN_ALARM received")
                 endTime = intent.getLongExtra(EXTRA_END_TIME, 0)
                 currentIndex = intent.getIntExtra(EXTRA_CURRENT_INDEX, 0)
                 totalAlarms = intent.getIntExtra(EXTRA_TOTAL_ALARMS, 0)
@@ -314,13 +314,13 @@ class ChainService : Service() {
                 ChainManager(this).setChainSequence(isChain)
                 
                 DebugLogger.info("ChainService", "START_CHAIN_ALARM: index=$currentIndex, isChain=$isChain")
-                Log.d("ChainService", "Starting countdown for alarm $currentIndex/$totalAlarms, ends at $endTime")
+                DebugLogger.info("ChainService", "Starting countdown for alarm $currentIndex/$totalAlarms, ends at $endTime")
                 startCountdown()
             }
             ACTION_STOP_CHAIN -> {
                  DebugLogger.warn("ChainService", "STOP_CHAIN requested")
-                 Log.d("ChainService", ">>> ACTION_STOP_CHAIN received")
-                 Log.d("ChainService", "Before stop - ChainActive: ${ChainManager(this).isChainActive()}")
+                 DebugLogger.info("ChainService", ">>> ACTION_STOP_CHAIN received")
+                 DebugLogger.info("ChainService", "Before stop - ChainActive: ${ChainManager(this).isChainActive()}")
                  
                  // CRITICAL FIX: Cancel ALL possible scheduled alarms defensively
                  val alarmScheduler = AlarmScheduler(this)
@@ -330,7 +330,7 @@ class ChainService : Service() {
                  // Cancel alarm for current index
                  val currentIdx = ChainManager(this).getCurrentIndex()
                  val requestCode = currentIdx + 1
-                 Log.d("ChainService", "Canceling current alarm with requestCode: $requestCode")
+                 DebugLogger.info("ChainService", "Canceling current alarm with requestCode: $requestCode")
                  alarmScheduler.cancelAlarm(requestCode)
                  
                  // DEFENSIVE: Cancel all possible alarm codes (in case of desync)
@@ -344,53 +344,53 @@ class ChainService : Service() {
                  // Clear all active alarms in the repository (reuse repository and alarms from above)
                  val clearedAlarms = alarms.map { it.copy(isActive = false, scheduledTime = 0L) }
                  repository.saveAlarms(clearedAlarms)
-                 Log.d("ChainService", "All alarms cleared")
+                 DebugLogger.info("ChainService", "All alarms cleared")
                  
-                 Log.d("ChainService", "After stop - ChainActive: ${ChainManager(this).isChainActive()}")
+                 DebugLogger.info("ChainService", "After stop - ChainActive: ${ChainManager(this).isChainActive()}")
                  
                  // Also ensure any ringing alarm service is stopped directly
                  val stopAlarmIntent = Intent(this, AlarmService::class.java)
                  stopService(stopAlarmIntent)
-                 Log.d("ChainService", "AlarmService stop requested")
+                 DebugLogger.info("ChainService", "AlarmService stop requested")
                  
                  // Dismiss both notification IDs for safety
                  val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                  notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
                  notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
-                 Log.d("ChainService", "Notifications canceled")
+                 DebugLogger.info("ChainService", "Notifications canceled")
                  
-                 Log.d("ChainService", "Calling stopSelf()...")
+                 DebugLogger.info("ChainService", "Calling stopSelf()...")
                  stopSelf()
             }
             ACTION_PAUSE_CHAIN -> {
-                Log.d("ChainService", ">>> ACTION_PAUSE_CHAIN received")
+                DebugLogger.info("ChainService", ">>> ACTION_PAUSE_CHAIN received")
                 handlePause()
             }
             ACTION_RESUME_CHAIN -> {
-                Log.d("ChainService", ">>> ACTION_RESUME_CHAIN received")
+                DebugLogger.info("ChainService", ">>> ACTION_RESUME_CHAIN received")
                 handleResume()
             }
             ACTION_NEXT_ALARM -> {
-                Log.d("ChainService", ">>> ACTION_NEXT_ALARM received")
+                DebugLogger.info("ChainService", ">>> ACTION_NEXT_ALARM received")
                 handleNextAlarm()
             }
             ACTION_PREV_ALARM -> {
-                Log.d("ChainService", ">>> ACTION_PREV_ALARM received")
+                DebugLogger.info("ChainService", ">>> ACTION_PREV_ALARM received")
                 handlePrevAlarm()
             }
             ACTION_JUMP_TO_ALARM -> {
                 val targetIndex = intent.getIntExtra(EXTRA_TARGET_INDEX, -1)
-                Log.d("ChainService", ">>> ACTION_JUMP_TO_ALARM received, targetIndex=$targetIndex")
+                DebugLogger.info("ChainService", ">>> ACTION_JUMP_TO_ALARM received, targetIndex=$targetIndex")
                 if (targetIndex >= 0) {
                     handleJumpToAlarm(targetIndex)
                 }
             }
             ACTION_PAUSE_COUNTDOWN_LOOP -> {
-                Log.d("ChainService", ">>> ACTION_PAUSE_COUNTDOWN_LOOP received")
+                DebugLogger.info("ChainService", ">>> ACTION_PAUSE_COUNTDOWN_LOOP received")
                 handlePauseCountdownLoop()
             }
             ACTION_RESUME_COUNTDOWN_LOOP -> {
-                Log.d("ChainService", ">>> ACTION_RESUME_COUNTDOWN_LOOP received")
+                DebugLogger.info("ChainService", ">>> ACTION_RESUME_COUNTDOWN_LOOP received")
                 handleResumeCountdownLoop()
             }
             ACTION_TRIGGER_ALARM -> {
@@ -400,7 +400,7 @@ class ChainService : Service() {
                     "isAlarmRinging" to ChainManager(this).isAlarmRinging(),
                     "chainActive" to ChainManager(this).isChainActive()
                 ))
-                Log.d("BatteryOpt", "[TRIGGER] AlarmManager triggered alarm - Calling triggerAlarm()")
+                DebugLogger.info("BatteryOpt", "[TRIGGER] AlarmManager triggered alarm - Calling triggerAlarm()")
                 
                 // CRITICAL: Must call startForeground() when service started with startForegroundService()
                 // Create temporary notification just to satisfy Android requirement
@@ -418,14 +418,14 @@ class ChainService : Service() {
                         startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, tempNotification)
                     }
                 } catch (e: Exception) {
-                    Log.e("ChainService", "Error starting foreground in TRIGGER_ALARM", e)
+                    DebugLogger.error("ChainService", "Error starting foreground in TRIGGER_ALARM", e)
                 }
                 
                 // Now trigger the alarm (which will exit foreground and start AlarmService)
                 triggerAlarm()
             }
             else -> {
-                Log.w("ChainService", "Unknown action received: ${intent?.action}")
+                DebugLogger.warn("ChainService", "Unknown action received: ${intent?.action}")
                 
                 // CRITICAL FIX: If service restarted by Android with no action but chain is active,
                 // restore state from SharedPreferences
@@ -452,13 +452,13 @@ class ChainService : Service() {
                 }
             }
         }
-        Log.d("ChainService", "============================================")
+        DebugLogger.info("ChainService", "============================================")
         return START_NOT_STICKY
     }
 
     private fun handlePause() {
-        Log.d("ChainService", "========== PAUSE TIMER ==========")
-        Log.d("ChainService", "handlePause() called")
+        DebugLogger.info("ChainService", "========== PAUSE TIMER ==========")
+        DebugLogger.info("ChainService", "handlePause() called")
         // No loop to cancel
         // countdownJob?.cancel()
         
@@ -467,23 +467,23 @@ class ChainService : Service() {
         // CRITICAL FIX: Don't pause if time is already expired or very close to 0
         if (remaining <= 1) {
             DebugLogger.warn("ChainService", "BUG FIX: Refusing to pause with $remaining seconds remaining (too close to 0)")
-            Log.w("ChainService", "Cannot pause - remaining time is $remaining seconds, too close to trigger")
+            DebugLogger.warn("ChainService", "Cannot pause - remaining time is $remaining seconds, too close to trigger")
             return
         }
         
         // CRITICAL: Cancel the scheduled AlarmManager alarm!
         val alarmScheduler = AlarmScheduler(this)
         val requestCode = currentIndex + 1
-        Log.d("ChainService", "Canceling AlarmManager alarm with requestCode: $requestCode")
+        DebugLogger.info("ChainService", "Canceling AlarmManager alarm with requestCode: $requestCode")
         alarmScheduler.cancelAlarm(requestCode)
         
-        Log.d("ChainService", "Remaining time: ${remaining}s (${remaining * 1000}ms)")
-        Log.d("TimerSync", "[PAUSE] Saving remaining time: ${remaining * 1000}ms")
+        DebugLogger.info("ChainService", "Remaining time: ${remaining}s (${remaining * 1000}ms)")
+        DebugLogger.info("TimerSync", "[PAUSE] Saving remaining time: ${remaining * 1000}ms")
         
-        Log.d("ChainService", "Before pause - isPaused: ${ChainManager(this).isChainPaused()}")
+        DebugLogger.info("ChainService", "Before pause - isPaused: ${ChainManager(this).isChainPaused()}")
         ChainManager(this).pauseChain(remaining * 1000L)
-        Log.d("ChainService", "After pause - isPaused: ${ChainManager(this).isChainPaused()}")
-        Log.d("ChainService", "Saved remaining time: ${ChainManager(this).getPausedRemainingTime()}ms")
+        DebugLogger.info("ChainService", "After pause - isPaused: ${ChainManager(this).isChainPaused()}")
+        DebugLogger.info("ChainService", "Saved remaining time: ${ChainManager(this).getPausedRemainingTime()}ms")
         
         DebugLogger.info("TimerSync", "PAUSED: savedTime=${remaining * 1000}ms, endTime=$endTime cleared")
         
@@ -491,21 +491,21 @@ class ChainService : Service() {
         if (shouldShowNotification()) {
             showNotification(isPaused = true)
         }
-        Log.d("ChainService", "Pause complete")
-        Log.d("ChainService", "=================================")
+        DebugLogger.info("ChainService", "Pause complete")
+        DebugLogger.info("ChainService", "=================================")
     }
 
     private fun handleResume() {
-        Log.d("ChainService", "========== RESUME TIMER ==========")
-        Log.d("ChainService", "handleResume() called")
+        DebugLogger.info("ChainService", "========== RESUME TIMER ==========")
+        DebugLogger.info("ChainService", "handleResume() called")
         val remainingTimeMs = ChainManager(this).getPausedRemainingTime()
-        Log.d("ChainService", "Retrieved paused remaining time: ${remainingTimeMs}ms")
-        Log.d("TimerSync", "[RESUME] Reading saved time: ${remainingTimeMs}ms")
+        DebugLogger.info("ChainService", "Retrieved paused remaining time: ${remainingTimeMs}ms")
+        DebugLogger.info("TimerSync", "[RESUME] Reading saved time: ${remainingTimeMs}ms")
         
         // CRITICAL FIX: Don't resume if paused time is 0 or negative
         if (remainingTimeMs <= 1000) {
             DebugLogger.error("ChainService", "BUG FIX: Refusing to resume with ${remainingTimeMs}ms - would create instant alarm")
-            Log.e("ChainService", "Cannot resume - paused time is ${remainingTimeMs}ms, too low to schedule alarm")
+            DebugLogger.error("ChainService", "Cannot resume - paused time is ${remainingTimeMs}ms, too low to schedule alarm")
             // Just unpause without scheduling
             ChainManager(this).resumeChain()
             return
@@ -514,30 +514,30 @@ class ChainService : Service() {
         // CRITICAL: Reschedule the AlarmManager alarm with remaining time!
         val alarmScheduler = AlarmScheduler(this)
         val requestCode = currentIndex + 1
-        Log.d("ChainService", "Rescheduling AlarmManager alarm with requestCode: $requestCode, delay: ${remainingTimeMs}ms")
+        DebugLogger.info("ChainService", "Rescheduling AlarmManager alarm with requestCode: $requestCode, delay: ${remainingTimeMs}ms")
         alarmScheduler.scheduleAlarm(remainingTimeMs, requestCode)
         
         // Reset end time relative to now
         val oldEndTime = endTime
         endTime = System.currentTimeMillis() + remainingTimeMs
-        Log.d("ChainService", "New endTime calculated: $endTime (was: $oldEndTime)")
-        Log.d("TimerSync", "[RESUME] Calculated new endTime: now=${System.currentTimeMillis()} + ${remainingTimeMs}ms = $endTime")
+        DebugLogger.info("ChainService", "New endTime calculated: $endTime (was: $oldEndTime)")
+        DebugLogger.info("TimerSync", "[RESUME] Calculated new endTime: now=${System.currentTimeMillis()} + ${remainingTimeMs}ms = $endTime")
         
-        Log.d("ChainService", "Before resume - isPaused: ${ChainManager(this).isChainPaused()}")
+        DebugLogger.info("ChainService", "Before resume - isPaused: ${ChainManager(this).isChainPaused()}")
         ChainManager(this).resumeChain()
-        Log.d("ChainService", "After resume - isPaused: ${ChainManager(this).isChainPaused()}")
+        DebugLogger.info("ChainService", "After resume - isPaused: ${ChainManager(this).isChainPaused()}")
         
         // CRITICAL FIX #2: Restart countdown to show notification and persist state
         DebugLogger.info("ChainService", "Calling startCountdown() after resume")
-        Log.d("ChainService", "Restarting countdown (preserving dismissal state)...")
+        DebugLogger.info("ChainService", "Restarting countdown (preserving dismissal state)...")
         startCountdown(resetDismissalState = false)
-        Log.d("ChainService", "Resume complete")
-        Log.d("ChainService", "==================================")
+        DebugLogger.info("ChainService", "Resume complete")
+        DebugLogger.info("ChainService", "==================================")
     }
 
     
     private fun handleNextAlarm() {
-        Log.d("ChainService", "handleNextAlarm() called")
+        DebugLogger.info("ChainService", "handleNextAlarm() called")
         
         // Clear alarm ringing state
         ChainManager(this).setAlarmRinging(false)
@@ -556,7 +556,7 @@ class ChainService : Service() {
         // CHECK CHAIN MODE
         val isChain = ChainManager(this).isChainSequence()
         if (!isChain) {
-            Log.d("ChainService", "Single Alarm Mode - Stopping service after alarm")
+            DebugLogger.info("ChainService", "Single Alarm Mode - Stopping service after alarm")
             val stopIntent = Intent(this, ChainService::class.java).apply {
                 action = ACTION_STOP_CHAIN
             }
@@ -571,7 +571,7 @@ class ChainService : Service() {
         // Check if there's a next alarm
         val nextIndex = currentIndex + 1
         if (nextIndex < alarms.size) {
-            Log.d("ChainService", "Moving to next alarm: index $nextIndex")
+            DebugLogger.info("ChainService", "Moving to next alarm: index $nextIndex")
             
             // Update chain manager
             ChainManager(this).moveToNextAlarm()
@@ -598,9 +598,9 @@ class ChainService : Service() {
             // Start countdown for next alarm
             startCountdown()
             
-            Log.d("ChainService", "Next alarm started successfully")
+            DebugLogger.info("ChainService", "Next alarm started successfully")
         } else {
-            Log.d("ChainService", "No more alarms, stopping chain")
+            DebugLogger.info("ChainService", "No more alarms, stopping chain")
             // No more alarms, stop the chain
             val stopIntent = Intent(this, ChainService::class.java).apply {
                 action = ACTION_STOP_CHAIN
@@ -610,7 +610,7 @@ class ChainService : Service() {
     }
     
     private fun handlePrevAlarm() {
-        Log.d("ChainService", "handlePrevAlarm() called")
+        DebugLogger.info("ChainService", "handlePrevAlarm() called")
         
         // Clear alarm ringing state
         ChainManager(this).setAlarmRinging(false)
@@ -633,7 +633,7 @@ class ChainService : Service() {
         // Check if there's a previous alarm
         val prevIndex = currentIndex - 1
         if (prevIndex >= 0) {
-            Log.d("ChainService", "Moving to previous alarm: index $prevIndex")
+            DebugLogger.info("ChainService", "Moving to previous alarm: index $prevIndex")
             
             // CRITICAL FIX #4: Use moveToPrevAlarm() to reset pause state properly
             val chainManager = ChainManager(this)
@@ -661,14 +661,14 @@ class ChainService : Service() {
             // Start countdown for previous alarm
             startCountdown()
             
-            Log.d("ChainService", "Previous alarm started successfully")
+            DebugLogger.info("ChainService", "Previous alarm started successfully")
         } else {
-            Log.d("ChainService", "Already at first alarm, cannot go back")
+            DebugLogger.info("ChainService", "Already at first alarm, cannot go back")
         }
     }
     
     private fun handleJumpToAlarm(targetIndex: Int) {
-        Log.d("ChainService", "handleJumpToAlarm() called with targetIndex=$targetIndex")
+        DebugLogger.info("ChainService", "handleJumpToAlarm() called with targetIndex=$targetIndex")
         
         // Clear alarm ringing state
         ChainManager(this).setAlarmRinging(false)
@@ -687,11 +687,11 @@ class ChainService : Service() {
         
         // Validate target index
         if (targetIndex < 0 || targetIndex >= alarms.size) {
-            Log.e("ChainService", "Invalid target index: $targetIndex (total alarms: ${alarms.size})")
+            DebugLogger.error("ChainService", "Invalid target index: $targetIndex (total alarms: ${alarms.size})")
             return
         }
         
-        Log.d("ChainService", "Jumping to alarm at index $targetIndex")
+        DebugLogger.info("ChainService", "Jumping to alarm at index $targetIndex")
         
         // Update ChainManager with new index
         val chainManager = ChainManager(this)
@@ -720,16 +720,16 @@ class ChainService : Service() {
         // Start countdown for target alarm
         startCountdown()
         
-        Log.d("ChainService", "Successfully jumped to alarm at index $targetIndex")
+        DebugLogger.info("ChainService", "Successfully jumped to alarm at index $targetIndex")
     }
     
     private fun handlePauseCountdownLoop() {
-        Log.d("BatteryOpt", "[PAUSE] No-op: Polling loop removed for optimization")
+        DebugLogger.info("BatteryOpt", "[PAUSE] No-op: Polling loop removed for optimization")
         // No loop to pause, Service is already efficient
     }
     
     private fun handleResumeCountdownLoop() {
-        Log.d("BatteryOpt", "[RESUME] No-op: Polling loop removed for optimization")
+        DebugLogger.info("BatteryOpt", "[RESUME] No-op: Polling loop removed for optimization")
         // No loop to resume, Notification Cronometer handles it
     }
 }

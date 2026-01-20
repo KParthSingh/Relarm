@@ -18,7 +18,7 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("AlarmService", "Service created")
+        DebugLogger.info("AlarmService", "Service created")
 
         // Create notification channel
         NotificationHelper.createNotificationChannel(this)
@@ -29,18 +29,18 @@ class AlarmService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d("AlarmService", "onStartCommand with action: ${intent?.action}")
+        DebugLogger.info("AlarmService", "onStartCommand with action: ${intent?.action}")
         
         // Handle restore notification if user tries to swipe it away
         if (intent?.action == "RESTORE_NOTIFICATION") {
-            Log.d("AlarmService", "Restoring notification after swipe attempt")
+            DebugLogger.info("AlarmService", "Restoring notification after swipe attempt")
             val notification = NotificationHelper.buildAlarmNotification(this)
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
             notificationManager.notify(NotificationHelper.NOTIFICATION_ID, notification)
         } else {
             // Get custom sound URI if provided
             val soundUri = intent?.getStringExtra("soundUri")
-            Log.d("AlarmService", "Starting with sound URI: $soundUri")
+            DebugLogger.info("AlarmService", "Starting with sound URI: $soundUri")
             
             // Start playing alarm sound
             playAlarmSound(soundUri)
@@ -59,7 +59,7 @@ class AlarmService : Service() {
                 try {
                     android.net.Uri.parse(customSoundUri)
                 } catch (e: Exception) {
-                    Log.e("AlarmService", "Invalid custom sound URI, using default", e)
+                    DebugLogger.error("AlarmService", "Invalid custom sound URI, using default", e)
                     null
                 }
             } else {
@@ -70,7 +70,7 @@ class AlarmService : Service() {
             val finalUri = soundUri ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             
-            Log.d("AlarmService", "Playing alarm sound from URI: $finalUri")
+            DebugLogger.info("AlarmService", "Playing alarm sound from URI: $finalUri")
 
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(applicationContext, finalUri)
@@ -85,9 +85,9 @@ class AlarmService : Service() {
                 prepare()
                 start()
             }
-            Log.d("AlarmService", "Alarm sound started successfully")
+            DebugLogger.info("AlarmService", "Alarm sound started successfully")
         } catch (e: Exception) {
-            Log.e("AlarmService", "Error playing alarm sound", e)
+            DebugLogger.error("AlarmService", "Error playing alarm sound", e)
             // If all else fails, try system default as last resort
             try {
                 mediaPlayer = MediaPlayer().apply {
@@ -101,9 +101,9 @@ class AlarmService : Service() {
                     prepare()
                     start()
                 }
-                Log.d("AlarmService", "Fallback to default sound successful")
+                DebugLogger.info("AlarmService", "Fallback to default sound successful")
             } catch (fallbackException: Exception) {
-                Log.e("AlarmService", "Failed to play any alarm sound", fallbackException)
+                DebugLogger.error("AlarmService", "Failed to play any alarm sound", fallbackException)
             }
         }
     }
@@ -131,38 +131,38 @@ class AlarmService : Service() {
                 @Suppress("DEPRECATION")
                 vibrator?.vibrate(pattern, 0)
             }
-            Log.d("AlarmService", "Vibration started")
+            DebugLogger.info("AlarmService", "Vibration started")
         } catch (e: Exception) {
-            Log.e("AlarmService", "Error starting vibration", e)
+            DebugLogger.error("AlarmService", "Error starting vibration", e)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("AlarmService", "Service destroyed - stopping sound and vibration")
+        DebugLogger.info("AlarmService", "Service destroyed - stopping sound and vibration")
         
         // Stop media player
         try {
             mediaPlayer?.apply {
                 if (isPlaying) {
                     stop()
-                    Log.d("AlarmService", "MediaPlayer stopped")
+                    DebugLogger.info("AlarmService", "MediaPlayer stopped")
                 }
                 reset()
                 release()
-                Log.d("AlarmService", "MediaPlayer released")
+                DebugLogger.info("AlarmService", "MediaPlayer released")
             }
         } catch (e: Exception) {
-            Log.e("AlarmService", "Error stopping MediaPlayer", e)
+            DebugLogger.error("AlarmService", "Error stopping MediaPlayer", e)
         }
         mediaPlayer = null
 
         // Stop vibration
         try {
             vibrator?.cancel()
-            Log.d("AlarmService", "Vibration canceled")
+            DebugLogger.info("AlarmService", "Vibration canceled")
         } catch (e: Exception) {
-            Log.e("AlarmService", "Error stopping vibration", e)
+            DebugLogger.error("AlarmService", "Error stopping vibration", e)
         }
         vibrator = null
     }

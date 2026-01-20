@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
         
         // Initialize debug logger
         DebugLogger.init(this)
-        DebugLogger.info("MainActivity", "========== APP STARTED ==========")
+        DebugLogger.info("MainActivity", "== APP STARTED ==")
         
         alarmScheduler = AlarmScheduler(this)
         
@@ -219,7 +219,7 @@ class MainActivity : ComponentActivity() {
         val settingsRepository = SettingsRepository(this)
         val hideCounter = settingsRepository.getDismissableCounter()
         
-        Log.d("BatteryOpt", "[LIFECYCLE] App going to background - hideCounter: $hideCounter")
+        DebugLogger.info("BatteryOpt", "[LIFECYCLE] App going to background - hideCounter: $hideCounter")
         
         if (hideCounter) {
             val intent = Intent(this, ChainService::class.java).apply {
@@ -236,7 +236,7 @@ class MainActivity : ComponentActivity() {
         val settingsRepository = SettingsRepository(this)
         val hideCounter = settingsRepository.getDismissableCounter()
         
-        Log.d("BatteryOpt", "[LIFECYCLE] App coming to foreground - hideCounter: $hideCounter")
+        DebugLogger.info("BatteryOpt", "[LIFECYCLE] App coming to foreground - hideCounter: $hideCounter")
         
         if (hideCounter) {
             val intent = Intent(this, ChainService::class.java).apply {
@@ -417,7 +417,7 @@ fun MainScreen(
     fun saveAlarms() {
         val currentList = alarms.toList() // Snapshot
         repository.saveAlarms(currentList)
-        android.util.Log.d("DragOptimizer", "Saved ${currentList.size} alarms to persistence")
+        DebugLogger.info("DragOptimizer", "Saved ${currentList.size} alarms to persistence")
     }
 
     // REMOVED: LaunchedEffect(alarms) auto-saver to prevent lag during drag
@@ -491,29 +491,29 @@ fun MainScreen(
                         isChainSequence = isChainSequence,
                         alarms = alarms,
                         onPause = {
-                            android.util.Log.d("MainActivity", "PAUSE button clicked! Sending ACTION_PAUSE_CHAIN intent")
+                            DebugLogger.info("MainActivity", "PAUSE button clicked! Sending ACTION_PAUSE_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
                                 action = ChainService.ACTION_PAUSE_CHAIN
                             }
                             context.startService(intent)
-                            android.util.Log.d("MainActivity", "Pause intent sent, result: success")
+                            DebugLogger.info("MainActivity", "Pause intent sent, result: success")
                         },
                         onResume = {
-                            android.util.Log.d("MainActivity", "RESUME button clicked! Sending ACTION_RESUME_CHAIN intent")
+                            DebugLogger.info("MainActivity", "RESUME button clicked! Sending ACTION_RESUME_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
                                 action = ChainService.ACTION_RESUME_CHAIN
                             }
                             context.startService(intent)
-                            android.util.Log.d("MainActivity", "Resume intent sent")
+                            DebugLogger.info("MainActivity", "Resume intent sent")
                         },
                         isPaused = isPaused,
                         onStop = {
-                            android.util.Log.d("MainActivity", "STOP button clicked! Sending ACTION_STOP_CHAIN intent")
+                            DebugLogger.info("MainActivity", "STOP button clicked! Sending ACTION_STOP_CHAIN intent")
                             val intent = Intent(context, ChainService::class.java).apply {
                                 action = ChainService.ACTION_STOP_CHAIN
                             }
                             context.startService(intent)
-                            android.util.Log.d("MainActivity", "Stop intent sent")
+                            DebugLogger.info("MainActivity", "Stop intent sent")
                             
                             // Also clear all active alarms
                             alarms.forEachIndexed { i, a ->
@@ -524,28 +524,28 @@ fun MainScreen(
                             saveAlarms() // Save on stop
                         },
                         onDismiss = {
-                            android.util.Log.d("MainActivity", "DISMISS button clicked! Stopping alarm")
+                            DebugLogger.info("MainActivity", "DISMISS button clicked! Stopping alarm")
                             val stopAlarmIntent = Intent(context, AlarmStopReceiver::class.java).apply {
                                 action = "com.medicinereminder.app.STOP_ALARM"
                             }
                             context.sendBroadcast(stopAlarmIntent)
-                            android.util.Log.d("MainActivity", "Dismiss broadcast sent")
+                            DebugLogger.info("MainActivity", "Dismiss broadcast sent")
                         },
                         onNext = {
-                            android.util.Log.d("MainActivity", "NEXT button clicked! Sending ACTION_NEXT_ALARM intent")
+                            DebugLogger.info("MainActivity", "NEXT button clicked! Sending ACTION_NEXT_ALARM intent")
                             val intent = Intent(context, ChainService::class.java).apply {
                                 action = ChainService.ACTION_NEXT_ALARM
                             }
                             context.startService(intent)
-                            android.util.Log.d("MainActivity", "Next alarm intent sent")
+                            DebugLogger.info("MainActivity", "Next alarm intent sent")
                         },
                         onPrev = {
-                            android.util.Log.d("MainActivity", "PREV button clicked! Sending ACTION_PREV_ALARM intent")
+                            DebugLogger.info("MainActivity", "PREV button clicked! Sending ACTION_PREV_ALARM intent")
                             val intent = Intent(context, ChainService::class.java).apply {
                                 action = ChainService.ACTION_PREV_ALARM
                             }
                             context.startService(intent)
-                            android.util.Log.d("MainActivity", "Prev alarm intent sent")
+                            DebugLogger.info("MainActivity", "Prev alarm intent sent")
                         }
                     )
                 }
@@ -1000,7 +1000,7 @@ fun StickyChainBar(
     // This ensures when pause/resume happens, we recalculate immediately
     LaunchedEffect(isPaused, currentIndex) {
         // Log when the effect is triggered by state changes
-        Log.d("TimerSync", "[UI] LaunchedEffect triggered - isPaused=$isPaused, currentIndex=$currentIndex")
+        DebugLogger.info("TimerSync", "[UI] LaunchedEffect triggered - isPaused=$isPaused, currentIndex=$currentIndex")
         
         while (true) {
             // Get current state from ChainManager (same source as notification uses)
@@ -1024,7 +1024,7 @@ fun StickyChainBar(
             
             // Log significant time changes (more than 2 seconds difference or state changes)
             if (kotlin.math.abs(remainingTimeMs - oldRemainingMs) > 2000 || paused != isPaused) {
-                Log.d("TimerSync", "[UI] Time updated: $oldRemainingMs -> $remainingTimeMs (paused=$paused, endTime=$endTime)")
+                DebugLogger.info("TimerSync", "[UI] Time updated: $oldRemainingMs -> $remainingTimeMs (paused=$paused, endTime=$endTime)")
             }
             
             delay(1000) // Poll at 1000ms (1s) for text countdown display
@@ -1725,7 +1725,7 @@ fun AlarmItem(
                                         val delay = alarm.pausedRemainingMs
                                         val now = System.currentTimeMillis()
                                         
-                                        Log.d("AlarmItem", "RESUME clicked - remaining: ${delay}ms")
+                                        DebugLogger.info("AlarmItem", "RESUME clicked - remaining: ${delay}ms")
                                         
                                         // CRITICAL: Tell ChainService to resume (syncs notification)
                                         val resumeIntent = Intent(context, ChainService::class.java).apply {
@@ -1747,7 +1747,7 @@ fun AlarmItem(
                                         // Pausing - calculate and store remaining time
                                         val remaining = (alarm.scheduledTime - System.currentTimeMillis()).coerceAtLeast(0)
                                         
-                                        Log.d("AlarmItem", "PAUSE clicked - remaining: ${remaining}ms")
+                                        DebugLogger.info("AlarmItem", "PAUSE clicked - remaining: ${remaining}ms")
                                         
                                         // CRITICAL: Tell ChainService to pause (syncs notification)
                                         val pauseIntent = Intent(context, ChainService::class.java).apply {

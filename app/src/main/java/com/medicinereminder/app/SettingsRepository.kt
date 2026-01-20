@@ -18,6 +18,7 @@ class SettingsRepository(context: Context) {
         const val THEME_LIGHT = "light"
         const val THEME_DARK = "dark"
         const val THEME_AUTO = "auto"
+        const val KEY_ENABLE_DEBUG_LOGS = "enable_debug_logs"
     }
     
     fun getThemeMode(): String {
@@ -92,5 +93,13 @@ class SettingsRepository(context: Context) {
     
     fun setAutostartConfirmed(confirmed: Boolean) {
         prefs.edit().putBoolean("autostart_confirmed", confirmed).apply()
+    }
+    
+    fun getEnableDebugLogs(): Boolean {
+        return prefs.getBoolean(KEY_ENABLE_DEBUG_LOGS, false)
+    }
+    
+    fun setEnableDebugLogs(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENABLE_DEBUG_LOGS, enabled).apply()
     }
 }

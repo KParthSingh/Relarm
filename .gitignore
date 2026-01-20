@@ -9,3 +9,6 @@ local.properties
 *.iml
 TIMER_UI_SUMMARY.md
 changes.txt
+*.jks
+*.keystore
+signing.properties

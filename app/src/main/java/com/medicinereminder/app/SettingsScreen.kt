@@ -292,6 +292,22 @@ fun SettingsScreen(
                 tonalElevation = 1.dp
             ) {
                 Column {
+                    // Enable Debug Logs
+                    var debugLogsEnabled by remember { mutableStateOf(repository.getEnableDebugLogs()) }
+                    
+                    SettingsSwitchItem(
+                        title = "Enable Debug Logs",
+                        subtitle = "Write logs to disk for troubleshooting (Default OFF)",
+                        checked = debugLogsEnabled,
+                        onCheckedChange = { enabled ->
+                            debugLogsEnabled = enabled
+                            repository.setEnableDebugLogs(enabled)
+                            DebugLogger.setEnabled(enabled)
+                        }
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+
                     // Export Debug Logs
                     SettingsClickableItem(
                         title = "Export Debug Logs",
