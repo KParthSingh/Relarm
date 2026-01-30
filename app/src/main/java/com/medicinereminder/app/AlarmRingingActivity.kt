@@ -40,10 +40,30 @@ class AlarmRingingActivity : ComponentActivity() {
         const val EXTRA_ALARM_HOURS = "extra_alarm_hours"
         const val EXTRA_ALARM_MINUTES = "extra_alarm_minutes"
         const val EXTRA_ALARM_SECONDS = "extra_alarm_seconds"
+        const val ACTION_CLOSE = "com.medicinereminder.app.CLOSE_ALARM_ACTIVITY"
+    }
+    
+    // Receiver to handle external dismiss (from notification)
+    private val closeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_CLOSE) {
+                // Just finish the activity, don't trigger dismiss logic
+                // (alarm was already dismissed by AlarmStopReceiver)
+                finish()
+            }
+        }
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Register receiver to handle external dismiss requests
+        val filter = android.content.IntentFilter(ACTION_CLOSE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(closeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(closeReceiver, filter)
+        }
         
         // Set window flags to show over lock screen and turn screen on
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -83,8 +103,29 @@ class AlarmRingingActivity : ComponentActivity() {
             }
         }
     }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(closeReceiver)
+        } catch (e: IllegalArgumentException) {
+            // Receiver was not registered
+        }
+    }
 
     private fun dismissAlarm() {
+        val chainManager = ChainManager(this)
+        
+        // Check if the alarm was already dismissed (e.g., via notification)
+        // If so, just close the activity without triggering the next alarm logic
+        if (!chainManager.isAlarmRinging()) {
+            finish()
+            return
+        }
+        
+        // Clear alarm ringing state
+        chainManager.setAlarmRinging(false)
+        
         // Dismiss both notification IDs for safety (we now use CHAIN_NOTIFICATION_ID)
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
         notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
@@ -108,6 +149,23 @@ class AlarmRingingActivity : ComponentActivity() {
     }
 
     private fun dismissAlarmAndOpenApp() {
+        val chainManager = ChainManager(this)
+        
+        // Check if the alarm was already dismissed (e.g., via notification)
+        // If so, just open the app and close this activity without triggering next alarm logic
+        if (!chainManager.isAlarmRinging()) {
+            // Launch the main activity
+            val mainIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(mainIntent)
+            finish()
+            return
+        }
+        
+        // Clear alarm ringing state
+        chainManager.setAlarmRinging(false)
+        
         // Dismiss both notification IDs for safety (we now use CHAIN_NOTIFICATION_ID)
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
         notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)

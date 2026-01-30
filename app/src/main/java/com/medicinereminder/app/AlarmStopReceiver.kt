@@ -29,6 +29,10 @@ class AlarmStopReceiver : BroadcastReceiver() {
             notificationManager.cancel(NotificationHelper.NOTIFICATION_ID)
             notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
             
+            // Broadcast to close any open AlarmRingingActivity
+            val closeActivityIntent = Intent("com.medicinereminder.app.CLOSE_ALARM_ACTIVITY")
+            context.sendBroadcast(closeActivityIntent)
+            
             // DELEGATE NEXT STEP TO CHAIN SERVICE
             // ChainService.handleNextAlarm() will check isChainSequence() and decide 
             // whether to stop (Single Mode) or advance (Chain Mode).
