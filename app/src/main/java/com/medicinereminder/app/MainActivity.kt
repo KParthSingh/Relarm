@@ -1159,9 +1159,14 @@ fun StickyChainBar(
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
+                // Calculate when the next alarm will trigger
+            val nextAlarmTime = System.currentTimeMillis() + remainingTimeMs
+            val nextAlarmTimeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+            val formattedNextAlarmTime = nextAlarmTimeFormat.format(Date(nextAlarmTime))
+            
+            Text(
                     if (isPaused) "Resumes in: ${formatTime(remainingSeconds)}" 
-                    else if (isChainSequence) "Next alarm: ${formatTime(remainingSeconds)}"
+                    else if (isChainSequence) "Next alarm: $formattedNextAlarmTime"
                     else "Time remaining: ${formatTime(remainingSeconds)}",
                     style = MaterialTheme.typography.titleMedium,
                     color = if (isPaused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
