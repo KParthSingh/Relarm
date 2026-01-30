@@ -231,12 +231,16 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Use alarm name if available, otherwise fallback to "Alarm"
+        val notificationTitle = "⏰ $alarmName"
+        val notificationContent = "Scheduled for: $timeText"
+        
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("⏰ " + context.getString(R.string.alarm_ringing))
-            .setContentText(context.getString(R.string.alarm_ringing_subtitle))
+            .setContentTitle(notificationTitle)
+            .setContentText(notificationContent)
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("${context.getString(R.string.alarm_ringing_subtitle)}\n\nScheduled for: $timeText"))
+                .bigText("Scheduled for: $timeText"))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(false)
@@ -248,7 +252,7 @@ object NotificationHelper {
             .setColor(Color.parseColor("#6750A4")) // Match app primary color
             .addAction(
                 android.R.drawable.ic_delete,
-                "SNOOZE / STOP", // Clearer action text
+                "DISMISS",
                 stopPendingIntent
             )
             .setVibrate(longArrayOf(0, 500, 200, 500))
