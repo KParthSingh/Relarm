@@ -147,10 +147,11 @@ fun PermissionsScreen(
         },
         bottomBar = {
             // Floating Done Button
-            Surface(
-                shadowElevation = 8.dp,
-                tonalElevation = 3.dp
-            ) {
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                Surface(
+                    shadowElevation = 8.dp,
+                    tonalElevation = 3.dp
+                ) {
                 Button(
                     onClick = {
                         val repository = SettingsRepository(context)
@@ -173,6 +174,7 @@ fun PermissionsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                }
                 }
             }
         }

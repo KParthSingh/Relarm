@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -103,6 +104,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Ensure app content does NOT draw under system navigation bar
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         
         // Initialize debug logger
         DebugLogger.init(this)
@@ -553,10 +557,11 @@ fun MainScreen(
                 // Persistent Start Button at bottom - fills entire bottom bar
                 val anyActive = alarms.any { it.isActive }
                 val settingsRepository = remember { SettingsRepository(context) }
-                Surface(
-                    shadowElevation = 8.dp,
-                    tonalElevation = 3.dp
-                ) {
+                Column(modifier = Modifier.navigationBarsPadding()) {
+                    Surface(
+                        shadowElevation = 8.dp,
+                        tonalElevation = 3.dp
+                    ) {
                     Button(
                         onClick = {
                             chainManager.startChain()
@@ -599,6 +604,7 @@ fun MainScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                    }
                     }
                 }
             }
@@ -780,7 +786,7 @@ fun MainScreen(
                             modifier = Modifier
                                 .padding(horizontal = 10.dp)
                                 .alpha(if (isDragging) 0f else 1f)
-                                .animateItemPlacement()
+                                .animateItem()
                                 .onGloballyPositioned { coordinates ->
                                     itemHeights[alarm.id] = coordinates.size.height
                                     itemCoordinates[alarm.id] = coordinates
@@ -1038,6 +1044,7 @@ fun StickyChainBar(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .padding(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

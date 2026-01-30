@@ -8,6 +8,7 @@ import android.view.HapticFeedbackConstants
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.view.WindowCompat
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -57,6 +58,9 @@ class AlarmRingingActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Ensure app content does NOT draw under system navigation bar
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         
         // Register SharedPreferences listener to detect external dismiss
         chainPrefs = getSharedPreferences("chain_prefs", Context.MODE_PRIVATE)
