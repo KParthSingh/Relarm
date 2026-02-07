@@ -141,7 +141,8 @@ class ChainService : Service() {
             endTime, // Pass endTime for Chronometer
             currentAlarmName,
             isPaused,
-            isChain // PASS FLAG
+            isChain, // PASS FLAG
+            endTime // Pass endTime as trigger time for nameless alarms
         )
         
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -372,6 +373,26 @@ class ChainService : Service() {
             }
             ACTION_NEXT_ALARM -> {
                 DebugLogger.info("ChainService", ">>> ACTION_NEXT_ALARM received")
+                
+                // CRITICAL: Must call startForeground() when service started with startForegroundService()
+                // This is required by Android when AlarmStopReceiver starts ChainService
+                val tempNotification = NotificationHelper.buildChainNotification(
+                    this,
+                    currentIndex + 1,
+                    totalAlarms,
+                    System.currentTimeMillis(),
+                    currentAlarmName
+                )
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, tempNotification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                    } else {
+                        startForeground(NotificationHelper.CHAIN_NOTIFICATION_ID, tempNotification)
+                    }
+                } catch (e: Exception) {
+                    DebugLogger.error("ChainService", "Error starting foreground in NEXT_ALARM", e)
+                }
+                
                 handleNextAlarm()
             }
             ACTION_PREV_ALARM -> {

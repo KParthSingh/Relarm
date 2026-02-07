@@ -23,7 +23,8 @@ object NotificationHelper {
         endTime: Long,
         nextAlarmName: String,
         isPaused: Boolean = false,
-        isChainSequence: Boolean = true // Default to true
+        isChainSequence: Boolean = true, // Default to true
+        nextAlarmTriggerTime: Long = 0L // Trigger time for nameless alarms
     ): android.app.Notification {
         // Countdown notification
         val stopIntent = Intent(context, ChainService::class.java).apply {
@@ -86,7 +87,21 @@ object NotificationHelper {
         val content = if (isPaused) {
             "Tap RESUME to continue."
         } else {
-            if (isChainSequence) "Next: ${if(nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"}" else "Time remaining..."
+            if (isChainSequence) {
+                if (nextAlarmTriggerTime > 0) {
+                    val sdf = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+                    val timeStr = sdf.format(java.util.Date(nextAlarmTriggerTime))
+                    if (nextAlarmName.isNotEmpty()) {
+                        "$nextAlarmName at $timeStr"
+                    } else {
+                        "Rings at $timeStr"
+                    }
+                } else {
+                    if (nextAlarmName.isNotEmpty()) nextAlarmName else "Alarm"
+                }
+            } else {
+                "Time remaining..."
+            }
         }
 
         // Get settings repository for notification configuration
