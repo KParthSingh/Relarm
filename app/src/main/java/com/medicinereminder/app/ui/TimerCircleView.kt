@@ -1,4 +1,4 @@
-package com.medicinereminder.app.ui
+package com.relarm.app.ui
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.Box

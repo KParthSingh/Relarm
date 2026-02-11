@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.content.Context
 import android.content.Intent
@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.medicinereminder.app.ui.theme.MedicineReminderTheme
+import com.relarm.app.ui.theme.RelarmTheme
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -41,7 +41,7 @@ class AlarmRingingActivity : ComponentActivity() {
         const val EXTRA_ALARM_HOURS = "extra_alarm_hours"
         const val EXTRA_ALARM_MINUTES = "extra_alarm_minutes"
         const val EXTRA_ALARM_SECONDS = "extra_alarm_seconds"
-        const val ACTION_CLOSE = "com.medicinereminder.app.CLOSE_ALARM_ACTIVITY"
+        const val ACTION_CLOSE = "com.relarm.app.CLOSE_ALARM_ACTIVITY"
     }
     
     // Listener to detect when alarm is dismissed externally (via notification)
@@ -88,7 +88,7 @@ class AlarmRingingActivity : ComponentActivity() {
         val themeMode = settingsRepository.getThemeMode()
 
         setContent {
-            MedicineReminderTheme(themeMode = themeMode) {
+            RelarmTheme(themeMode = themeMode) {
                 AlarmRingingScreen(
                     alarmName = alarmName,
                     alarmHours = alarmHours,
@@ -312,7 +312,7 @@ fun AlarmRingingScreen(
                         modifier = Modifier.size(240.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        com.medicinereminder.app.ui.TimerCircleView(
+                        com.relarm.app.ui.TimerCircleView(
                             scheduledTime = 0L,
                             totalDuration = 1000L,
                             isExpired = true,  // This makes it red and blinking

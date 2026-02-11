@@ -1,6 +1,6 @@
 @file:OptIn(dev.chrisbanes.snapper.ExperimentalSnapperApi::class)
 
-package com.medicinereminder.app.ui
+package com.relarm.app.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*

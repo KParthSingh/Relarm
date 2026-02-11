@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import java.util.UUID
 

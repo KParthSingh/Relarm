@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.content.Context
 import com.google.gson.Gson

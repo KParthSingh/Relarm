@@ -1,4 +1,4 @@
-package com.medicinereminder.app.ui.theme
+package com.relarm.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

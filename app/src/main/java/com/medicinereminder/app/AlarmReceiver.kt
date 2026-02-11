@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
@@ -19,7 +19,7 @@ class AlarmReceiver : BroadcastReceiver() {
             PowerManager.PARTIAL_WAKE_LOCK or 
             PowerManager.ACQUIRE_CAUSES_WAKEUP or
             PowerManager.ON_AFTER_RELEASE,
-            "MedicineReminder::AlarmWakeLock"
+            "Relarm::AlarmWakeLock"
         )
         wakeLock.acquire(10 * 60 * 1000L) // 10 minutes max
 

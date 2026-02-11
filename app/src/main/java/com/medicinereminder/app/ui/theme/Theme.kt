@@ -1,4 +1,4 @@
-package com.medicinereminder.app.ui.theme
+package com.relarm.app.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -75,7 +75,7 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun MedicineReminderTheme(
+fun RelarmTheme(
     themeMode: String = "auto", // "light", "dark", or "auto"
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,

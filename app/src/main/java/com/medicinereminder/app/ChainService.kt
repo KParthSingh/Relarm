@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.app.NotificationManager
 import android.app.Service
@@ -252,16 +252,16 @@ class ChainService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
-        const val ACTION_START_CHAIN_ALARM = "com.medicinereminder.app.START_CHAIN_ALARM"
-        const val ACTION_STOP_CHAIN = "com.medicinereminder.app.STOP_CHAIN"
-        const val ACTION_PAUSE_CHAIN = "com.medicinereminder.app.PAUSE_CHAIN"
-        const val ACTION_RESUME_CHAIN = "com.medicinereminder.app.RESUME_CHAIN"
-        const val ACTION_NEXT_ALARM = "com.medicinereminder.app.NEXT_ALARM"
-        const val ACTION_PREV_ALARM = "com.medicinereminder.app.PREV_ALARM"
-        const val ACTION_JUMP_TO_ALARM = "com.medicinereminder.app.JUMP_TO_ALARM"
-        const val ACTION_PAUSE_COUNTDOWN_LOOP = "com.medicinereminder.app.PAUSE_COUNTDOWN_LOOP"
-        const val ACTION_RESUME_COUNTDOWN_LOOP = "com.medicinereminder.app.RESUME_COUNTDOWN_LOOP"
-        const val ACTION_TRIGGER_ALARM = "com.medicinereminder.app.TRIGGER_ALARM"
+        const val ACTION_START_CHAIN_ALARM = "com.relarm.app.START_CHAIN_ALARM"
+        const val ACTION_STOP_CHAIN = "com.relarm.app.STOP_CHAIN"
+        const val ACTION_PAUSE_CHAIN = "com.relarm.app.PAUSE_CHAIN"
+        const val ACTION_RESUME_CHAIN = "com.relarm.app.RESUME_CHAIN"
+        const val ACTION_NEXT_ALARM = "com.relarm.app.NEXT_ALARM"
+        const val ACTION_PREV_ALARM = "com.relarm.app.PREV_ALARM"
+        const val ACTION_JUMP_TO_ALARM = "com.relarm.app.JUMP_TO_ALARM"
+        const val ACTION_PAUSE_COUNTDOWN_LOOP = "com.relarm.app.PAUSE_COUNTDOWN_LOOP"
+        const val ACTION_RESUME_COUNTDOWN_LOOP = "com.relarm.app.RESUME_COUNTDOWN_LOOP"
+        const val ACTION_TRIGGER_ALARM = "com.relarm.app.TRIGGER_ALARM"
         
         const val EXTRA_END_TIME = "end_time"
         const val EXTRA_CURRENT_INDEX = "current_index"

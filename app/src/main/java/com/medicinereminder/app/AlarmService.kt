@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.app.Service
 import android.content.Intent

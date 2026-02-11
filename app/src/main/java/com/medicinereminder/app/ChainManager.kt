@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.content.Context
 import kotlinx.coroutines.channels.awaitClose

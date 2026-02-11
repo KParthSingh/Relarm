@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.content.Context
 import android.util.Log
@@ -198,7 +198,7 @@ object DebugLogger {
             
             val allFiles = getAllLogFiles().sortedByDescending { it.lastModified() }
             
-            exportFile.appendText("=== Medicine Reminder Debug Log Export ===\n")
+            exportFile.appendText("=== Relarm Debug Log Export ===\n")
             exportFile.appendText("Export Date: ${dateFormat.format(Date())}\n")
             exportFile.appendText("Total Files: ${allFiles.size}\n")
             exportFile.appendText("==========================================\n\n")

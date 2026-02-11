@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RelativeTimer"
+rootProject.name = "Relarm"
 include(":app")

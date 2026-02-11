@@ -5,14 +5,14 @@ plugins {
 }
 
 android {
-    namespace = "com.medicinereminder.app"
+    namespace = "com.relarm.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.medicinereminder.app"
+        applicationId = "com.relarm.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 30200
+        versionCode = 30205
         versionName = "3.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -31,7 +31,7 @@ android {
             output.outputFileName = if (buildType.name == "debug") {
                 "Debug-${versionName}-${debugBuildNumber}.apk"
             } else {
-                "RelativeTimer-${versionName}.apk"
+                "Relarm-${versionName}.apk"
             }
         }
     }
@@ -51,8 +51,8 @@ android {
             applicationIdSuffix = ".debug"
             
             // This sets the app name for the debug version
-            // When installed, the debug app will show as "RelativeTimer-Debug"
-            resValue("string", "app_name", "RelativeTimer-Debug")
+            // When installed, the debug app will show as "Relarm-Debug"
+            resValue("string", "app_name", "Relarm-Debug")
         }
     }
 

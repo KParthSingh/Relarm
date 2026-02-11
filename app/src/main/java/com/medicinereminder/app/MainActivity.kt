@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.Manifest
 import android.app.AlarmManager
@@ -65,8 +65,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
-import com.medicinereminder.app.ui.theme.MedicineReminderTheme
-import com.medicinereminder.app.ui.SimpleDurationPicker
+import com.relarm.app.ui.theme.RelarmTheme
+import com.relarm.app.ui.SimpleDurationPicker
 import java.util.Locale
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
             
-            MedicineReminderTheme(themeMode = themeMode) {
+            RelarmTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -530,7 +530,7 @@ fun MainScreen(
                         onDismiss = {
                             DebugLogger.info("MainActivity", "DISMISS button clicked! Stopping alarm")
                             val stopAlarmIntent = Intent(context, AlarmStopReceiver::class.java).apply {
-                                action = "com.medicinereminder.app.STOP_ALARM"
+                                action = "com.relarm.app.STOP_ALARM"
                             }
                             context.sendBroadcast(stopAlarmIntent)
                             DebugLogger.info("MainActivity", "Dismiss broadcast sent")
@@ -1583,7 +1583,7 @@ fun AlarmItem(
                         contentAlignment = Alignment.Center
                     ) {
                         // Progress circle
-                        com.medicinereminder.app.ui.TimerCircleView(
+                        com.relarm.app.ui.TimerCircleView(
                             scheduledTime = effectiveScheduledTime,
                             totalDuration = alarm.getTotalSeconds() * 1000L,
                             isExpired = effectiveState == AlarmState.EXPIRED,

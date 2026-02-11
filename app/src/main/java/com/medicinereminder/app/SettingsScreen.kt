@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,7 +20,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.medicinereminder.app.ui.SimpleDurationPicker
+import com.relarm.app.ui.SimpleDurationPicker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

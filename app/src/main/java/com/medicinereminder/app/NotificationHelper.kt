@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,7 +10,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 
 object NotificationHelper {
-    const val CHANNEL_ID = "medicine_reminder_channel"
+    const val CHANNEL_ID = "relarm_channel"
     const val NOTIFICATION_ID = 1001
     const val CHAIN_NOTIFICATION_ID = 1003
 
@@ -217,7 +217,7 @@ object NotificationHelper {
         )
 
         val stopIntent = Intent(context, AlarmStopReceiver::class.java).apply {
-            action = "com.medicinereminder.app.STOP_ALARM"
+            action = "com.relarm.app.STOP_ALARM"
         }
         val stopPendingIntent = PendingIntent.getBroadcast(
             context,

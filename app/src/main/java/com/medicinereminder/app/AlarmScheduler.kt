@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -20,7 +20,7 @@ class AlarmScheduler(private val context: Context) {
         DebugLogger.info("AlarmScheduler", "  Delay: ${delayMillis}ms (${delayMillis/1000}s)")
         
         val intent = Intent(context, AlarmReceiver::class.java).apply {
-            action = "com.medicinereminder.app.ALARM_TRIGGERED"
+            action = "com.relarm.app.ALARM_TRIGGERED"
             putExtra("REQUEST_CODE", requestCode)
         }
 
@@ -97,7 +97,7 @@ class AlarmScheduler(private val context: Context) {
         DebugLogger.info("AlarmScheduler", "  Was alarm scheduled: $wasScheduled")
         
         val intent = Intent(context, AlarmReceiver::class.java).apply {
-            action = "com.medicinereminder.app.ALARM_TRIGGERED"
+            action = "com.relarm.app.ALARM_TRIGGERED"
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

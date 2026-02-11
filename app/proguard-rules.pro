@@ -6,6 +6,6 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Keep alarm-related classes
--keep class com.medicinereminder.app.AlarmReceiver { *; }
--keep class com.medicinereminder.app.BootReceiver { *; }
--keep class com.medicinereminder.app.AlarmService { *; }
+-keep class com.relarm.app.AlarmReceiver { *; }
+-keep class com.relarm.app.BootReceiver { *; }
+-keep class com.relarm.app.AlarmService { *; }

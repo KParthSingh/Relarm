@@ -1,4 +1,4 @@
-package com.medicinereminder.app
+package com.relarm.app
 
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
@@ -8,7 +8,7 @@ import android.util.Log
 
 class AlarmStopReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == "com.medicinereminder.app.STOP_ALARM") {
+        if (intent.action == "com.relarm.app.STOP_ALARM") {
             DebugLogger.warn("AlarmStopReceiver", "========== DISMISS ALARM CLICKED ==========")
             val chainManager = ChainManager(context)
             DebugLogger.logState("AlarmStopReceiver", mapOf(
@@ -30,7 +30,7 @@ class AlarmStopReceiver : BroadcastReceiver() {
             notificationManager.cancel(NotificationHelper.CHAIN_NOTIFICATION_ID)
             
             // Broadcast to close any open AlarmRingingActivity
-            val closeActivityIntent = Intent("com.medicinereminder.app.CLOSE_ALARM_ACTIVITY")
+            val closeActivityIntent = Intent("com.relarm.app.CLOSE_ALARM_ACTIVITY")
             context.sendBroadcast(closeActivityIntent)
             
             // DELEGATE NEXT STEP TO CHAIN SERVICE

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MedicineReminder" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.Relarm" parent="android:Theme.Material.NoActionBar">
         <!-- Splash Screen Background for Dark Mode -->
         <item name="android:windowSplashScreenBackground">#1A1B20</item>
         <item name="android:windowBackground">#1A1B20</item>
